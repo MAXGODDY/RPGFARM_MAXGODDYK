@@ -1,0 +1,11 @@
+{
+	"RemapUnityFiles": 
+	{
+		"Module.MyProject.gen.cpp.obj": [
+			"MainCheracter.gen.cpp.obj",
+			"MyClass.gen.cpp.obj",
+			"MyProject.init.gen.cpp.obj",
+			"ThifCatcher.gen.cpp.obj"
+		]
+	}
+}
