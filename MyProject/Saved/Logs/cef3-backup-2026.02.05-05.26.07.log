@@ -1,0 +1,53 @@
+[3100:24676:0205/072123.258:WARNING:chrome_main_delegate.cc(745)] This is Chrome version 128.0.6613.138 (not a warning)
+[3100:376:0205/072123.345:ERROR:google_update_settings.cc(265)] Failed opening key Software\Chromium to set usagestats; result: 5
+[3100:24676:0205/072123.398:WARNING:account_consistency_mode_manager.cc(77)] Desktop Identity Consistency cannot be enabled as no OAuth client ID and client secret have been configured.
+[3100:24676:0205/072127.772:WARNING:external_registry_loader_win.cc(232)] Error observing HKLM: 5
+[16388:8300:0205/072130.305:WARNING:frame_impl.cc(430)] virtual CefFrameImpl::SendProcessMessage sent to detached frame 5-5F1D3AFEAB7971A37C7665D7DF0383D1 will be ignored
+[3100:26448:0205/072131.978:WARNING:browser_info.cc(345)] Returning a speculative frame for [8,9]
+[3100:24676:0205/072132.642:WARNING:browser_info.cc(345)] Returning a speculative frame for [9,9]
+[3100:24676:0205/072132.642:WARNING:browser_info.cc(345)] Returning a speculative frame for [9,9]
+[3100:24676:0205/072132.642:WARNING:browser_info.cc(345)] Returning a speculative frame for [9,9]
+[3100:24676:0205/072132.642:WARNING:browser_info.cc(345)] Returning a speculative frame for [9,9]
+[3100:26448:0205/072132.645:WARNING:browser_info.cc(345)] Returning a speculative frame for [9,9]
+[23188:25072:0205/072334.001:VERBOSE1:video_capture_oracle.cc(91)] Capture size auto-throttling is now enabled.
+[23188:25072:0205/072334.001:VERBOSE1:video_capture_oracle.cc(120)] Capture size auto-throttling is now disabled.
+[23188:25072:0205/072334.001:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1x1
+[23188:25072:0205/072334.001:VERBOSE1:capture_resolution_chooser.cc(157)] Recomputed capture size from 640x360 to 1x1 (100% of ideal size)
+[23188:25072:0205/072334.120:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1x1
+[23188:25072:0205/072334.228:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1000x567
+[23188:25072:0205/072334.228:VERBOSE1:capture_resolution_chooser.cc(157)] Recomputed capture size from 1x1 to 1000x567 (100% of ideal size)
+[23188:25072:0205/072334.228:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1000x567
+[23188:25072:0205/072335.265:VERBOSE1:video_capture_oracle.cc(91)] Capture size auto-throttling is now enabled.
+[23188:25072:0205/072335.265:VERBOSE1:video_capture_oracle.cc(120)] Capture size auto-throttling is now disabled.
+[23188:25072:0205/072335.266:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1000x567
+[23188:25072:0205/072335.266:VERBOSE1:capture_resolution_chooser.cc(157)] Recomputed capture size from 640x360 to 1000x567 (100% of ideal size)
+[4548:26276:0205/072335.281:WARNING:frame_impl.cc(430)] virtual CefFrameImpl::SendProcessMessage sent to detached frame A-5E7C6BB324E557CC47CA6DA11AE4375B will be ignored
+[23188:25072:0205/072335.970:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1000x567
+[23188:25072:0205/072336.051:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1000x567
+[23188:25072:0205/072336.060:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 813x442
+[23188:25072:0205/072336.060:VERBOSE1:capture_resolution_chooser.cc(157)] Recomputed capture size from 1000x567 to 813x442 (100% of ideal size)
+[23188:25072:0205/072336.119:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 813x442
+[23188:25072:0205/072336.121:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1920x1024
+[23188:25072:0205/072336.121:VERBOSE1:capture_resolution_chooser.cc(157)] Recomputed capture size from 813x442 to 1920x1024 (100% of ideal size)
+[23188:25072:0205/072336.509:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1916x1045
+[23188:25072:0205/072336.509:VERBOSE1:capture_resolution_chooser.cc(157)] Recomputed capture size from 1920x1024 to 1916x1045 (100% of ideal size)
+[23188:25072:0205/072336.509:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1916x1045
+[23188:25072:0205/072336.543:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1916x1045
+[23188:25072:0205/072336.563:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1216x651
+[23188:25072:0205/072336.563:VERBOSE1:capture_resolution_chooser.cc(157)] Recomputed capture size from 1916x1045 to 1216x651 (100% of ideal size)
+[23188:25072:0205/072336.627:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1216x651
+[23188:25072:0205/072336.672:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 796x415
+[23188:25072:0205/072336.672:VERBOSE1:capture_resolution_chooser.cc(157)] Recomputed capture size from 1216x651 to 796x415 (100% of ideal size)
+[23188:25072:0205/072336.945:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 796x415
+[23188:25072:0205/072336.946:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1920x1024
+[23188:25072:0205/072336.946:VERBOSE1:capture_resolution_chooser.cc(157)] Recomputed capture size from 796x415 to 1920x1024 (100% of ideal size)
+[23188:25072:0205/072344.613:VERBOSE1:video_capture_oracle.cc(91)] Capture size auto-throttling is now enabled.
+[23188:25072:0205/072344.613:VERBOSE1:video_capture_oracle.cc(120)] Capture size auto-throttling is now disabled.
+[23188:25072:0205/072344.613:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1x1
+[23188:25072:0205/072344.613:VERBOSE1:capture_resolution_chooser.cc(157)] Recomputed capture size from 640x360 to 1x1 (100% of ideal size)
+[23188:25072:0205/072345.336:VERBOSE1:capture_resolution_chooser.cc(205)] Recomputed snapped frame sizes: 1x1
+[23188:25072:0205/072406.984:VERBOSE1:video_capture_oracle.cc(165)] Content sampler now detects animation.
+[23188:25072:0205/072407.401:VERBOSE1:video_capture_oracle.cc(173)] Content sampler detects animation ended.
+[23188:25072:0205/072411.799:VERBOSE1:video_capture_oracle.cc(165)] Content sampler now detects animation.
+[23188:25072:0205/072412.000:VERBOSE1:video_capture_oracle.cc(173)] Content sampler detects animation ended.
+[3100:24676:0205/072607.279:WARNING:pref_notifier_impl.cc(41)] Pref observer for media_router.cast_allow_all_ips found at shutdown.
