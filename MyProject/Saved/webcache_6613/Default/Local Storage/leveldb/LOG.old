@@ -1,3 +1,6 @@
-2026/02/05-03:57:31.820 4334 Reusing MANIFEST C:\RPGFARM_MAXGODDYK\MyProject\Saved\webcache_6613\Default\Local Storage\leveldb/MANIFEST-000001
-2026/02/05-03:57:31.836 4334 Recovering log #3
-2026/02/05-03:57:31.838 4334 Reusing old log C:\RPGFARM_MAXGODDYK\MyProject\Saved\webcache_6613\Default\Local Storage\leveldb/000003.log 
+2026/02/05-07:26:31.693 534c Reusing MANIFEST C:\RPGFARM_MAXGODDYK\MyProject\Saved\webcache_6613\Default\Local Storage\leveldb/MANIFEST-000001
+2026/02/05-07:26:31.701 534c Recovering log #3
+2026/02/05-07:26:31.703 534c Reusing old log C:\RPGFARM_MAXGODDYK\MyProject\Saved\webcache_6613\Default\Local Storage\leveldb/000003.log 
+2026/02/05-07:27:37.951 7cc Level-0 table #5: started
+2026/02/05-07:27:37.957 7cc Level-0 table #5: 59535 bytes OK
+2026/02/05-07:27:37.963 7cc Delete type=0 #3
