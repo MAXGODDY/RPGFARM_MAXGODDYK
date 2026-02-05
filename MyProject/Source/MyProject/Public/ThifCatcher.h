@@ -23,5 +23,15 @@ public:
 
 	UPROPERTY(VisibleAnywhere)
 	UCameraComponent* Camera;
+
+
+	virtual void SetupPlayerInputComponent(class UInputComponent* MyPlayerInput) override; //Подключаем базовую логику движка для инпута
+
+	void MoveForwardBackward(float Value);
+
+	void MoveRightLeft(float Value);
+
+	void Jump();
+	void StopJump();
 		
 };
