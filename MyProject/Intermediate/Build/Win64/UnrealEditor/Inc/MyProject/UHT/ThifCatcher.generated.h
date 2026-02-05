@@ -20,7 +20,7 @@ PRAGMA_DISABLE_DEPRECATION_WARNINGS
 struct Z_Construct_UClass_AThifCatcher_Statics;
 MYPROJECT_API UClass* Z_Construct_UClass_AThifCatcher_NoRegister();
 
-#define FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_16_INCLASS_NO_PURE_DECLS \
+#define FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_18_INCLASS_NO_PURE_DECLS \
 private: \
 	static void StaticRegisterNativesAThifCatcher(); \
 	friend struct ::Z_Construct_UClass_AThifCatcher_Statics; \
@@ -31,7 +31,7 @@ public: \
 	DECLARE_SERIALIZER(AThifCatcher)
 
 
-#define FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_16_ENHANCED_CONSTRUCTORS \
+#define FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_18_ENHANCED_CONSTRUCTORS \
 	/** Deleted move- and copy-constructors, should never be used */ \
 	AThifCatcher(AThifCatcher&&) = delete; \
 	AThifCatcher(const AThifCatcher&) = delete; \
@@ -41,12 +41,12 @@ public: \
 	NO_API virtual ~AThifCatcher();
 
 
-#define FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_13_PROLOG
-#define FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_16_GENERATED_BODY \
+#define FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_15_PROLOG
+#define FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_18_GENERATED_BODY \
 PRAGMA_DISABLE_DEPRECATION_WARNINGS \
 public: \
-	FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_16_INCLASS_NO_PURE_DECLS \
-	FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_16_ENHANCED_CONSTRUCTORS \
+	FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_18_INCLASS_NO_PURE_DECLS \
+	FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h_18_ENHANCED_CONSTRUCTORS \
 private: \
 PRAGMA_ENABLE_DEPRECATION_WARNINGS
 

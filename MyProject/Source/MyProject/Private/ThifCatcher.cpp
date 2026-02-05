@@ -39,6 +39,9 @@ void AThifCatcher::SetupPlayerInputComponent(UInputComponent* MyPlayerInput)
 	MyPlayerInput->BindAction("Jump", IE_Pressed, this, &AThifCatcher::Jump);
 	MyPlayerInput->BindAction("Jump", IE_Released, this, &AThifCatcher::StopJump);
 
+	MyPlayerInput->BindAction("Sprint", IE_Pressed, this, &AThifCatcher::Sprint);
+	MyPlayerInput->BindAction("Sprint", IE_Released, this, &AThifCatcher::StopSprint);
+
 }
 
 void AThifCatcher::MoveForwardBackward(float Value)
@@ -66,4 +69,65 @@ void AThifCatcher::Jump()
 void AThifCatcher::StopJump()
 {
 	bPressedJump = false;
+}
+
+							//====================================Sprint=======================
+void AThifCatcher::Sprint()
+{
+
+	bIsSprint = true;
+	GetCharacterMovement()->MaxWalkSpeed = 800.0f;
+
+	DecreaseStamina();
+}
+
+
+void AThifCatcher::StopSprint()
+{
+	bIsSpatiallyLoaded = false;
+	GetCharacterMovement()->MaxWalkSpeed = 600.0f;
+	IncreaseStamina();
+}
+
+void AThifCatcher::DecreaseStamina()
+{
+	CurrentStamina = Stamina - MinusStamina;
+	Stamina = CurrentStamina;
+
+	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, FString::Printf(TEXT("Stamina: %f"), Stamina));
+}
+
+void AThifCatcher::IncreaseStamina()
+{
+	if (bIsSprint == false)
+	{
+		CurrentStamina = Stamina + PlusStamina;
+		Stamina = CurrentStamina;
+
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, FString::Printf(TEXT("Stamina: %f"), Stamina));
+	}
+
+}
+
+
+void AThifCatcher::Tick(float DeltaTime)
+{
+	if (bIsSprint == true && Stamina != 0.f)
+	{
+		DecreaseStamina();
+	}
+	else
+	{
+		if (bIsSprint == false && Stamina != 100.f)
+		{
+			IncreaseStamina();
+		}
+	}
+
+	if(FMath::IsNearlyZero(Stamina))
+	{
+		StopSprint();
+	}
+
+
 }
