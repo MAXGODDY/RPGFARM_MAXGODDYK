@@ -56,6 +56,11 @@ void AThifCatcher::MoveRightLeft(float Value)
 void AThifCatcher::Jump()
 {
 	bPressedJump = true;
+
+	if (JumpAnimation)
+	{
+		PlayAnimMontage(JumpAnimation, 1.0, NAME_None);
+	}
 }
 
 void AThifCatcher::StopJump()

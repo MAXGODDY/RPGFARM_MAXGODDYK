@@ -1,0 +1,7 @@
+[11284:20576:0205/110527.916:WARNING:chrome_main_delegate.cc(745)] This is Chrome version 128.0.6613.138 (not a warning)
+[11284:23040:0205/110527.974:ERROR:google_update_settings.cc(265)] Failed opening key Software\Chromium to set usagestats; result: 5
+[11284:20576:0205/110527.995:WARNING:account_consistency_mode_manager.cc(77)] Desktop Identity Consistency cannot be enabled as no OAuth client ID and client secret have been configured.
+[11284:20576:0205/110531.322:WARNING:external_registry_loader_win.cc(232)] Error observing HKLM: 5
+[14168:17216:0205/110535.966:WARNING:frame_impl.cc(430)] virtual CefFrameImpl::SendProcessMessage sent to detached frame 5-24B321F8E1C5775B43CCD11F3F7B2072 will be ignored
+[25508:25640:0205/110536.977:WARNING:frame_impl.cc(430)] virtual CefFrameImpl::SendProcessMessage sent to detached frame 6-3FB2716AC5AA789D97AB2A5FFBA8C5DC will be ignored
+[16508:19752:0205/110537.307:ERROR:shared_image_manager.cc(224)] SharedImageManager::ProduceSkia: Trying to Produce a Skia representation from a non-existent mailbox.

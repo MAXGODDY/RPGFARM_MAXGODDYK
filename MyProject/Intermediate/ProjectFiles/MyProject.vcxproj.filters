@@ -51,6 +51,9 @@
     <ClCompile Include="..\..\Source\MyProject\Private\MyClass.cpp">
       <Filter>Source\MyProject\Private</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Source\MyProject\Private\PlayerAnimInstance.cpp">
+      <Filter>Source\MyProject\Private</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\Source\MyProject\Private\ThiefCatcerGameMode.cpp">
       <Filter>Source\MyProject\Private</Filter>
     </ClCompile>
@@ -64,6 +67,9 @@
       <Filter>Source\MyProject\Public</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\MyProject\Public\MyClass.h">
+      <Filter>Source\MyProject\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Source\MyProject\Public\PlayerAnimInstance.h">
       <Filter>Source\MyProject\Public</Filter>
     </ClInclude>
     <ClInclude Include="..\..\Source\MyProject\Public\ThiefCatcerGameMode.h">

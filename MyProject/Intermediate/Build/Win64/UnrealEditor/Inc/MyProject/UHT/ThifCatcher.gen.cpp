@@ -12,6 +12,7 @@ static_assert(!UE_WITH_CONSTINIT_UOBJECT, "This generated code can only be compi
 void EmptyLinkFunctionForGeneratedCodeThifCatcher() {}
 
 // ********** Begin Cross Module References ********************************************************
+ENGINE_API UClass* Z_Construct_UClass_UAnimMontage_NoRegister();
 ENGINE_API UClass* Z_Construct_UClass_UCameraComponent_NoRegister();
 ENGINE_API UClass* Z_Construct_UClass_USpringArmComponent_NoRegister();
 MYPROJECT_API UClass* Z_Construct_UClass_AMainCheracter();
@@ -71,11 +72,16 @@ struct Z_Construct_UClass_AThifCatcher_Statics
 		{ "EditInline", "true" },
 		{ "ModuleRelativePath", "Public/ThifCatcher.h" },
 	};
+	static constexpr UECodeGen_Private::FMetaDataPairParam NewProp_JumpAnimation_MetaData[] = {
+		{ "Category", "JampAnimation" },
+		{ "ModuleRelativePath", "Public/ThifCatcher.h" },
+	};
 #endif // WITH_METADATA
 
 // ********** Begin Class AThifCatcher constinit property declarations *****************************
 	static const UECodeGen_Private::FObjectPropertyParams NewProp_SpringArm;
 	static const UECodeGen_Private::FObjectPropertyParams NewProp_Camera;
+	static const UECodeGen_Private::FObjectPropertyParams NewProp_JumpAnimation;
 	static const UECodeGen_Private::FPropertyParamsBase* const PropPointers[];
 // ********** End Class AThifCatcher constinit property declarations *******************************
 	static UObject* (*const DependentSingletons[])();
@@ -88,9 +94,11 @@ struct Z_Construct_UClass_AThifCatcher_Statics
 // ********** Begin Class AThifCatcher Property Definitions ****************************************
 const UECodeGen_Private::FObjectPropertyParams Z_Construct_UClass_AThifCatcher_Statics::NewProp_SpringArm = { "SpringArm", nullptr, (EPropertyFlags)0x00100000000a0009, UECodeGen_Private::EPropertyGenFlags::Object, RF_Public|RF_Transient|RF_MarkAsNative, nullptr, nullptr, 1, STRUCT_OFFSET(AThifCatcher, SpringArm), Z_Construct_UClass_USpringArmComponent_NoRegister, METADATA_PARAMS(UE_ARRAY_COUNT(NewProp_SpringArm_MetaData), NewProp_SpringArm_MetaData) };
 const UECodeGen_Private::FObjectPropertyParams Z_Construct_UClass_AThifCatcher_Statics::NewProp_Camera = { "Camera", nullptr, (EPropertyFlags)0x00100000000a0009, UECodeGen_Private::EPropertyGenFlags::Object, RF_Public|RF_Transient|RF_MarkAsNative, nullptr, nullptr, 1, STRUCT_OFFSET(AThifCatcher, Camera), Z_Construct_UClass_UCameraComponent_NoRegister, METADATA_PARAMS(UE_ARRAY_COUNT(NewProp_Camera_MetaData), NewProp_Camera_MetaData) };
+const UECodeGen_Private::FObjectPropertyParams Z_Construct_UClass_AThifCatcher_Statics::NewProp_JumpAnimation = { "JumpAnimation", nullptr, (EPropertyFlags)0x0010000000000005, UECodeGen_Private::EPropertyGenFlags::Object, RF_Public|RF_Transient|RF_MarkAsNative, nullptr, nullptr, 1, STRUCT_OFFSET(AThifCatcher, JumpAnimation), Z_Construct_UClass_UAnimMontage_NoRegister, METADATA_PARAMS(UE_ARRAY_COUNT(NewProp_JumpAnimation_MetaData), NewProp_JumpAnimation_MetaData) };
 const UECodeGen_Private::FPropertyParamsBase* const Z_Construct_UClass_AThifCatcher_Statics::PropPointers[] = {
 	(const UECodeGen_Private::FPropertyParamsBase*)&Z_Construct_UClass_AThifCatcher_Statics::NewProp_SpringArm,
 	(const UECodeGen_Private::FPropertyParamsBase*)&Z_Construct_UClass_AThifCatcher_Statics::NewProp_Camera,
+	(const UECodeGen_Private::FPropertyParamsBase*)&Z_Construct_UClass_AThifCatcher_Statics::NewProp_JumpAnimation,
 };
 static_assert(UE_ARRAY_COUNT(Z_Construct_UClass_AThifCatcher_Statics::PropPointers) < 2048);
 // ********** End Class AThifCatcher Property Definitions ******************************************
@@ -133,10 +141,10 @@ AThifCatcher::~AThifCatcher() {}
 struct Z_CompiledInDeferFile_FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h__Script_MyProject_Statics
 {
 	static constexpr FClassRegisterCompiledInInfo ClassInfo[] = {
-		{ Z_Construct_UClass_AThifCatcher, AThifCatcher::StaticClass, TEXT("AThifCatcher"), &Z_Registration_Info_UClass_AThifCatcher, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(AThifCatcher), 4184051557U) },
+		{ Z_Construct_UClass_AThifCatcher, AThifCatcher::StaticClass, TEXT("AThifCatcher"), &Z_Registration_Info_UClass_AThifCatcher, CONSTRUCT_RELOAD_VERSION_INFO(FClassReloadVersionInfo, sizeof(AThifCatcher), 2259553602U) },
 	};
 }; // Z_CompiledInDeferFile_FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h__Script_MyProject_Statics 
-static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h__Script_MyProject_1688749299{
+static FRegisterCompiledInInfo Z_CompiledInDeferFile_FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h__Script_MyProject_1642470981{
 	TEXT("/Script/MyProject"),
 	Z_CompiledInDeferFile_FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h__Script_MyProject_Statics::ClassInfo, UE_ARRAY_COUNT(Z_CompiledInDeferFile_FID_RPGFARM_MAXGODDYK_MyProject_Source_MyProject_Public_ThifCatcher_h__Script_MyProject_Statics::ClassInfo),
 	nullptr, 0,

@@ -5,6 +5,7 @@
 			"MainCheracter.gen.cpp.obj",
 			"MyClass.gen.cpp.obj",
 			"MyProject.init.gen.cpp.obj",
+			"ThiefCatcerGameMode.gen.cpp.obj",
 			"ThifCatcher.gen.cpp.obj"
 		]
 	}

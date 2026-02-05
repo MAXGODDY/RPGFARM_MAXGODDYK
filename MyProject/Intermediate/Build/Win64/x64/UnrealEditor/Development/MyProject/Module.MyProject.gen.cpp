@@ -2,5 +2,6 @@
 #include "C:/RPGFARM_MAXGODDYK/MyProject/Intermediate/Build/Win64/UnrealEditor/Inc/MyProject/UHT/MainCheracter.gen.cpp"
 #include "C:/RPGFARM_MAXGODDYK/MyProject/Intermediate/Build/Win64/UnrealEditor/Inc/MyProject/UHT/MyClass.gen.cpp"
 #include "C:/RPGFARM_MAXGODDYK/MyProject/Intermediate/Build/Win64/UnrealEditor/Inc/MyProject/UHT/MyProject.init.gen.cpp"
+#include "C:/RPGFARM_MAXGODDYK/MyProject/Intermediate/Build/Win64/UnrealEditor/Inc/MyProject/UHT/PlayerAnimInstance.gen.cpp"
 #include "C:/RPGFARM_MAXGODDYK/MyProject/Intermediate/Build/Win64/UnrealEditor/Inc/MyProject/UHT/ThiefCatcerGameMode.gen.cpp"
 #include "C:/RPGFARM_MAXGODDYK/MyProject/Intermediate/Build/Win64/UnrealEditor/Inc/MyProject/UHT/ThifCatcher.gen.cpp"

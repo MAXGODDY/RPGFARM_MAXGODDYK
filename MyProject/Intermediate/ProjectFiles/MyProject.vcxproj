@@ -269,6 +269,9 @@
     <ClCompile Include="..\..\Source\MyProject\Private\MyClass.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
+    <ClCompile Include="..\..\Source\MyProject\Private\PlayerAnimInstance.cpp">
+      <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
     <ClCompile Include="..\..\Source\MyProject\Private\ThiefCatcerGameMode.cpp">
       <AdditionalIncludeDirectories>$(ClCompile_AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -277,6 +280,7 @@
     </ClCompile>
     <ClInclude Include="..\..\Source\MyProject\Public\MainCheracter.h"/>
     <ClInclude Include="..\..\Source\MyProject\Public\MyClass.h"/>
+    <ClInclude Include="..\..\Source\MyProject\Public\PlayerAnimInstance.h"/>
     <ClInclude Include="..\..\Source\MyProject\Public\ThiefCatcerGameMode.h"/>
     <ClInclude Include="..\..\Source\MyProject\Public\ThifCatcher.h"/>
   </ItemGroup>
