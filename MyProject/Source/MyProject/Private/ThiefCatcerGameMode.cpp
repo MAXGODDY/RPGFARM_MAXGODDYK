@@ -1,14 +1,33 @@
 #include "ThiefCatcerGameMode.h"
+
+#include "Misc/PackageName.h"
+#include "ThiefPlayerController.h"
+#include "UI/PlayerGameHUD.h"
 #include "UObject/ConstructorHelpers.h"
 
 AThiefCatcerGameMode::AThiefCatcerGameMode() : Super()
 {
-    // вызов FClassFinder
-    ConstructorHelpers::FClassFinder<APawn> MainCharacterThiefCatcher(TEXT("/Game/Blueprints/Bp_MyThifCatcher"));
+	ConstructorHelpers::FClassFinder<APawn> MainCharacterThiefCatcher(TEXT("/Game/Blueprints/Bp_MyThifCatcher"));
+	if (MainCharacterThiefCatcher.Succeeded())
+	{
+		DefaultPawnClass = MainCharacterThiefCatcher.Class;
+	}
 
-    // Проверка на успешную загрузку
-    if (MainCharacterThiefCatcher.Succeeded())
-    {
-        DefaultPawnClass = MainCharacterThiefCatcher.Class;
-    }
+	PlayerControllerClass = AThiefPlayerController::StaticClass();
+	HUDClass = APlayerGameHUD::StaticClass();
+}
+
+APawn* AThiefCatcerGameMode::SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot)
+{
+	if (GetWorld())
+	{
+		FString MapName = GetWorld()->GetMapName();
+		MapName.RemoveFromStart(GetWorld()->StreamingLevelsPrefix);
+		if (FPackageName::GetShortName(MapName).Equals(TEXT("NewMap"), ESearchCase::IgnoreCase))
+		{
+			return nullptr;
+		}
+	}
+
+	return Super::SpawnDefaultPawnFor_Implementation(NewPlayer, StartSpot);
 }

@@ -18,5 +18,5 @@ public:
 
 	AThiefCatcerGameMode();
 
-	
+	virtual APawn* SpawnDefaultPawnFor_Implementation(AController* NewPlayer, AActor* StartSpot) override;
 };
