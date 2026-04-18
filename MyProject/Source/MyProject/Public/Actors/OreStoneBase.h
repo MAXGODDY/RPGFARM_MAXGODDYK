@@ -38,6 +38,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Ore Reward")
 	int32 GetOreExperienceReward() const;
 
+	void RefreshHealthBarVisibilityState();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
@@ -87,6 +89,7 @@ protected:
 private:
 	void RefreshHealthBar();
 	void UpdateHealthBarVisibility();
+	void RefreshPlayerInHealthBarRange();
 	void BreakOre();
 	void RespawnOre();
 

@@ -3,7 +3,7 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "KismetAnimationLibrary.h"
-#include "ThifCatcher.h"
+#include "GameplayCharacterBase.h"
 
 void UPlayerAnimInstance::NativeInitializeAnimation()
 {
@@ -60,9 +60,9 @@ void UPlayerAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		bIsAccelerating = false;
 	}
 
-	if (const AThifCatcher* ThifCatcher = Cast<AThifCatcher>(MyCharacter))
+	if (const AGameplayCharacterBase* GameplayCharacter = Cast<AGameplayCharacterBase>(MyCharacter))
 	{
-		bIsAttacking = ThifCatcher->bIsAttacking;
+		bIsAttacking = GameplayCharacter->bIsAttacking;
 	}
 	else
 	{

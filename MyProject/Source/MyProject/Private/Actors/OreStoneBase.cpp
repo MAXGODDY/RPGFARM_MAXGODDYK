@@ -5,6 +5,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "ThiefPlayerController.h"
 #include "TimerManager.h"
 #include "UI/OreHealthBarWidget.h"
 
@@ -81,6 +82,7 @@ void AOreStoneBase::ResetOreHealth()
 	}
 
 	RefreshHealthBar();
+	RefreshPlayerInHealthBarRange();
 	UpdateHealthBarVisibility();
 }
 
@@ -134,6 +136,7 @@ void AOreStoneBase::BeginPlay()
 	}
 
 	RefreshHealthBar();
+	RefreshPlayerInHealthBarRange();
 	UpdateHealthBarVisibility();
 }
 
@@ -183,6 +186,12 @@ void AOreStoneBase::RefreshHealthBar()
 	}
 }
 
+void AOreStoneBase::RefreshHealthBarVisibilityState()
+{
+	RefreshPlayerInHealthBarRange();
+	UpdateHealthBarVisibility();
+}
+
 void AOreStoneBase::UpdateHealthBarVisibility()
 {
 	if (!HealthBarWidgetComponent)
@@ -196,7 +205,33 @@ void AOreStoneBase::UpdateHealthBarVisibility()
 		return;
 	}
 
+	if (const AThiefPlayerController* ThiefController = Cast<AThiefPlayerController>(UGameplayStatics::GetPlayerController(this, 0)))
+	{
+		if (ThiefController->IsAnyModalOpen() || ThiefController->IsLoadingGameplayMap())
+		{
+			HealthBarWidgetComponent->SetVisibility(false);
+			return;
+		}
+	}
+
 	HealthBarWidgetComponent->SetVisibility(bPlayerInHealthBarRange);
+}
+
+void AOreStoneBase::RefreshPlayerInHealthBarRange()
+{
+	if (!bOreAvailable || !HealthBarTriggerSphere)
+	{
+		bPlayerInHealthBarRange = false;
+		return;
+	}
+
+	if (APawn* PlayerPawn = UGameplayStatics::GetPlayerPawn(this, 0))
+	{
+		bPlayerInHealthBarRange = HealthBarTriggerSphere->IsOverlappingActor(PlayerPawn);
+		return;
+	}
+
+	bPlayerInHealthBarRange = false;
 }
 
 void AOreStoneBase::BreakOre()
@@ -246,6 +281,7 @@ void AOreStoneBase::RespawnOre()
 	}
 
 	RefreshHealthBar();
+	RefreshPlayerInHealthBarRange();
 	UpdateHealthBarVisibility();
 }
 

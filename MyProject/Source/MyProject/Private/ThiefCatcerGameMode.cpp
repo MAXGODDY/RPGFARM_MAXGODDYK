@@ -7,10 +7,18 @@
 
 AThiefCatcerGameMode::AThiefCatcerGameMode() : Super()
 {
-	ConstructorHelpers::FClassFinder<APawn> MainCharacterThiefCatcher(TEXT("/Game/Blueprints/Bp_MyThifCatcher"));
-	if (MainCharacterThiefCatcher.Succeeded())
+	ConstructorHelpers::FClassFinder<APawn> SandboxCharacterThiefCatcher(TEXT("/Game/Blueprints/BP_MyThifCatcher_Sandbox"));
+	if (SandboxCharacterThiefCatcher.Succeeded())
 	{
-		DefaultPawnClass = MainCharacterThiefCatcher.Class;
+		DefaultPawnClass = SandboxCharacterThiefCatcher.Class;
+	}
+	else
+	{
+		ConstructorHelpers::FClassFinder<APawn> MainCharacterThiefCatcher(TEXT("/Game/Blueprints/Bp_MyThifCatcher"));
+		if (MainCharacterThiefCatcher.Succeeded())
+		{
+			DefaultPawnClass = MainCharacterThiefCatcher.Class;
+		}
 	}
 
 	PlayerControllerClass = AThiefPlayerController::StaticClass();
