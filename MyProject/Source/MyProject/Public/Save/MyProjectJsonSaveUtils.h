@@ -64,6 +64,9 @@ struct FMyProjectCharacterSaveData
 	int32 CollectedGold = 0;
 
 	UPROPERTY()
+	int32 StaminaPotionCount = 0;
+
+	UPROPERTY()
 	int32 PlayerLevel = 1;
 
 	UPROPERTY()

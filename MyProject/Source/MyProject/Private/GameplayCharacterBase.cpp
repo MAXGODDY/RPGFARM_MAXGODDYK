@@ -3,6 +3,8 @@
 #include "Actors/OreStoneBase.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Components/InputComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -25,8 +27,10 @@ AGameplayCharacterBase::AGameplayCharacterBase()
 	MaxStamina = 100.0f;
 	Stamina = MaxStamina;
 	CurrentStamina = Stamina;
-	MinusStamina = 1.0f;
-	PlusStamina = 1.0f;
+	MinusStamina = 32.0f;
+	PlusStamina = 26.0f;
+	MovingStaminaRegen = 2.5f;
+	StaminaRegenDelay = 0.85f;
 	OreDamage = 1.0f;
 	AttackRange = 350.0f;
 	AttackCooldown = 0.45f;
@@ -38,11 +42,14 @@ AGameplayCharacterBase::AGameplayCharacterBase()
 	MoveSpeedUpgradeAmount = 30.0f;
 	bCanAttack = true;
 	bIsAttacking = false;
+	TimeSinceLastStaminaUse = StaminaRegenDelay;
 	CollectedOreResources = 0;
 	CollectedGold = 0;
+	StaminaPotionCount = 0;
 	PlayerLevel = 1;
 	CurrentExperience = 0;
 	ExperienceToNextLevel = BaseExperienceToNextLevel;
+	StaminaPotionRestoreAmount = 40.0f;
 	ResourceCounterWidget = nullptr;
 	StaminaBarWidget = nullptr;
 
@@ -55,6 +62,8 @@ AGameplayCharacterBase::AGameplayCharacterBase()
 		TEXT("/Game/MainPlayer/Animations/AM_Pickaxe_Attack.AM_Pickaxe_Attack"));
 	static ConstructorHelpers::FObjectFinder<UAnimMontage> DefaultAttackMontageFinder(
 		TEXT("/Game/MainPlayer/Animations/AM_Pickaxe_Attack_Montage.AM_Pickaxe_Attack_Montage"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultPickaxeMeshFinder(
+		TEXT("/Game/DEMO_MiningPack/StaticMeshes/SM_DEMOPickaxe2.SM_DEMOPickaxe2"));
 	if (DefaultAttackMontageFinder.Succeeded())
 	{
 		AttackMontage = DefaultAttackMontageFinder.Object;
@@ -77,6 +86,12 @@ AGameplayCharacterBase::AGameplayCharacterBase()
 	{
 		AttackTimingAnimation = nullptr;
 	}
+
+	EquippedPickaxeMesh = DefaultPickaxeMeshFinder.Succeeded() ? DefaultPickaxeMeshFinder.Object : nullptr;
+	PickaxeAttachSocketName = TEXT("LeftHandSocket");
+	PickaxeRelativeLocation = FVector::ZeroVector;
+	PickaxeRelativeRotation = FRotator::ZeroRotator;
+	PickaxeRelativeScale = FVector(1.0f, 1.0f, 1.0f);
 }
 
 void AGameplayCharacterBase::BeginPlay()
@@ -87,10 +102,22 @@ void AGameplayCharacterBase::BeginPlay()
 	LoadCharacterDataFromJson();
 	UpdateResourceCounter();
 	UpdateStaminaBar();
+
+	SyncAttachedVisualInputState();
+	AttachPickaxeToAttachedVisual();
+	GetWorldTimerManager().SetTimerForNextTick(this, &AGameplayCharacterBase::SyncAttachedVisualInputState);
+	GetWorldTimerManager().SetTimerForNextTick(this, &AGameplayCharacterBase::AttachPickaxeToAttachedVisual);
+	GetWorldTimerManager().SetTimer(
+		AttachedVisualInputSyncTimerHandle,
+		this,
+		&AGameplayCharacterBase::SyncAttachedVisualInputState,
+		0.25f,
+		false);
 }
 
 void AGameplayCharacterBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	GetWorldTimerManager().ClearTimer(AttachedVisualInputSyncTimerHandle);
 	SaveCharacterDataToJson();
 	Super::EndPlay(EndPlayReason);
 }
@@ -105,22 +132,30 @@ void AGameplayCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	}
 
 	PlayerInputComponent->BindAction(TEXT("Attack"), IE_Pressed, this, &AGameplayCharacterBase::Attack);
+	PlayerInputComponent->BindAction(TEXT("UsePotion"), IE_Pressed, this, &AGameplayCharacterBase::HandleUseStaminaPotionInput);
 }
 
 void AGameplayCharacterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (bIsSprint && !FMath::IsNearlyZero(Stamina))
+	const bool bHasMovementIntent = HasMovementInputIntent();
+	const bool bIsActivelySprinting = bIsSprint && bHasMovementIntent;
+
+	if (bIsActivelySprinting && !FMath::IsNearlyZero(Stamina))
 	{
 		DecreaseStamina();
 	}
-	else if (!bIsSprint && !FMath::IsNearlyEqual(Stamina, MaxStamina))
+	else
 	{
-		IncreaseStamina();
+		TimeSinceLastStaminaUse += DeltaTime;
+		if (!bIsSprint && !FMath::IsNearlyEqual(Stamina, MaxStamina) && TimeSinceLastStaminaUse >= StaminaRegenDelay)
+		{
+			IncreaseStamina();
+		}
 	}
 
-	if (FMath::IsNearlyZero(Stamina))
+	if (FMath::IsNearlyZero(Stamina) && bIsActivelySprinting)
 	{
 		SetSprintActive(false);
 	}
@@ -153,6 +188,10 @@ void AGameplayCharacterBase::Attack()
 	bIsAttacking = true;
 	SetSprintActive(false);
 	StopJumping();
+	if (AController* CurrentController = GetController())
+	{
+		CurrentController->SetIgnoreMoveInput(true);
+	}
 
 	const float EffectiveAttackDuration = AttackMontage
 		? FMath::Max(AttackMontage->GetPlayLength(), 0.0f)
@@ -167,7 +206,9 @@ void AGameplayCharacterBase::Attack()
 		MovementComponent->DisableMovement();
 	}
 
-	if (AttackMontage)
+	SyncAttachedVisualInputState();
+	const bool bTriggeredAttachedVisualAttack = TriggerAttachedVisualAttack();
+	if (AttackMontage && !bTriggeredAttachedVisualAttack)
 	{
 		PlayAnimMontage(AttackMontage, 1.0f, NAME_None);
 	}
@@ -280,7 +321,34 @@ bool AGameplayCharacterBase::BuyStaminaPotion(const int32 GoldCost, const float 
 	}
 
 	CollectedGold -= GoldCost;
-	Stamina = FMath::Clamp(Stamina + RestoreAmount, 0.0f, MaxStamina);
+	StaminaPotionCount += 1;
+	StaminaPotionRestoreAmount = RestoreAmount;
+	SaveCharacterDataToJson();
+	return true;
+}
+
+bool AGameplayCharacterBase::UseStaminaPotion()
+{
+	if (StaminaPotionCount <= 0 || FMath::IsNearlyEqual(Stamina, MaxStamina))
+	{
+		return false;
+	}
+
+	if (bIsAttacking)
+	{
+		return false;
+	}
+
+	if (const AThiefPlayerController* ThiefController = Cast<AThiefPlayerController>(GetController()))
+	{
+		if (ThiefController->IsAnyModalOpen())
+		{
+			return false;
+		}
+	}
+
+	StaminaPotionCount -= 1;
+	Stamina = FMath::Clamp(Stamina + StaminaPotionRestoreAmount, 0.0f, MaxStamina);
 	CurrentStamina = Stamina;
 	UpdateStaminaBar();
 	SaveCharacterDataToJson();
@@ -352,21 +420,50 @@ float AGameplayCharacterBase::GetOreDamageAmount() const
 	return OreDamage;
 }
 
+int32 AGameplayCharacterBase::GetStaminaPotionCount() const
+{
+	return StaminaPotionCount;
+}
+
 void AGameplayCharacterBase::DecreaseStamina()
 {
-	CurrentStamina = FMath::Clamp(Stamina - MinusStamina, 0.0f, MaxStamina);
+	const UWorld* World = GetWorld();
+	const float DeltaTime = World ? World->GetDeltaSeconds() : 0.0f;
+	if (DeltaTime <= 0.0f)
+	{
+		return;
+	}
+
+	TimeSinceLastStaminaUse = 0.0f;
+	CurrentStamina = FMath::Clamp(Stamina - (MinusStamina * DeltaTime), 0.0f, MaxStamina);
 	Stamina = CurrentStamina;
 	UpdateStaminaBar();
 }
 
 void AGameplayCharacterBase::IncreaseStamina()
 {
-	if (!bIsSprint)
+	const UWorld* World = GetWorld();
+	const float DeltaTime = World ? World->GetDeltaSeconds() : 0.0f;
+	const bool bIsActivelySprinting = bIsSprint && HasMovementInputIntent();
+	if (DeltaTime <= 0.0f || bIsActivelySprinting || TimeSinceLastStaminaUse < StaminaRegenDelay)
 	{
-		CurrentStamina = FMath::Clamp(Stamina + PlusStamina, 0.0f, MaxStamina);
-		Stamina = CurrentStamina;
-		UpdateStaminaBar();
+		return;
 	}
+
+	const float RegenPerSecond = HasMovementInputIntent() ? MovingStaminaRegen : PlusStamina;
+	if (RegenPerSecond <= 0.0f)
+	{
+		return;
+	}
+
+	CurrentStamina = FMath::Clamp(Stamina + (RegenPerSecond * DeltaTime), 0.0f, MaxStamina);
+	Stamina = CurrentStamina;
+	UpdateStaminaBar();
+}
+
+bool AGameplayCharacterBase::HasMovementInputIntent() const
+{
+	return GetLastMovementInputVector().SizeSquared2D() > FMath::Square(0.05f);
 }
 
 void AGameplayCharacterBase::AddOreResources(const int32 ResourceAmount)
@@ -381,6 +478,11 @@ void AGameplayCharacterBase::AddOreResources(const int32 ResourceAmount)
 	SaveCharacterDataToJson();
 }
 
+void AGameplayCharacterBase::HandleUseStaminaPotionInput()
+{
+	UseStaminaPotion();
+}
+
 void AGameplayCharacterBase::TriggerAttackHit()
 {
 	GetWorldTimerManager().ClearTimer(AttackHitTimerHandle);
@@ -391,6 +493,10 @@ void AGameplayCharacterBase::FinishAttackState()
 {
 	GetWorldTimerManager().ClearTimer(AttackHitTimerHandle);
 	bIsAttacking = false;
+	if (AController* CurrentController = GetController())
+	{
+		CurrentController->SetIgnoreMoveInput(false);
+	}
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
@@ -421,51 +527,281 @@ void AGameplayCharacterBase::UpdateStaminaBar() const
 
 void AGameplayCharacterBase::TryDamageOre()
 {
-	APlayerController* PlayerController = Cast<APlayerController>(GetController());
-	if (!PlayerController)
+	UWorld* World = GetWorld();
+	if (!World)
 	{
 		return;
 	}
 
-	FVector TraceStart;
-	FRotator TraceRotation;
-	PlayerController->GetPlayerViewPoint(TraceStart, TraceRotation);
-
-	const FVector TraceEnd = TraceStart + (TraceRotation.Vector() * AttackRange);
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(OreAttackTrace), false, this);
-	QueryParams.AddIgnoredActor(this);
-	const FCollisionShape AttackShape = FCollisionShape::MakeSphere(65.0f);
-
-	FHitResult HitResult;
-	if (!GetWorld()->SweepSingleByChannel(HitResult, TraceStart, TraceEnd, FQuat::Identity, ECC_Visibility, AttackShape, QueryParams))
+	auto ResolveOreFromHit = [](const FHitResult& HitResult) -> AOreStoneBase*
 	{
-		return;
-	}
+		if (AOreStoneBase* OreStone = Cast<AOreStoneBase>(HitResult.GetActor()))
+		{
+			return OreStone;
+		}
 
-	if (AOreStoneBase* OreStone = Cast<AOreStoneBase>(HitResult.GetActor()))
+		if (UPrimitiveComponent* HitComponent = HitResult.GetComponent())
+		{
+			if (AOreStoneBase* OreStoneOwner = Cast<AOreStoneBase>(HitComponent->GetOwner()))
+			{
+				return OreStoneOwner;
+			}
+		}
+
+		return nullptr;
+	};
+
+	auto ApplyOreDamage = [this](AOreStoneBase* OreStone)
 	{
-		const bool bWillBreak = OreStone->IsOreAvailable() && OreStone->GetCurrentHealth() <= OreDamage;
+		if (!OreStone || !OreStone->IsOreAvailable())
+		{
+			return false;
+		}
+
+		const bool bWillBreak = OreStone->GetCurrentHealth() <= OreDamage;
 		OreStone->ApplyDamageToOre(OreDamage);
 		if (bWillBreak && !OreStone->IsOreAvailable())
 		{
 			AddOreResources(OreStone->GetOreResourceReward());
 			AddExperience(OreStone->GetOreExperienceReward());
 		}
+
+		return true;
+	};
+
+	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	{
+		FVector TraceStart;
+		FRotator TraceRotation;
+		PlayerController->GetPlayerViewPoint(TraceStart, TraceRotation);
+
+		const FVector TraceEnd = TraceStart + (TraceRotation.Vector() * AttackRange);
+		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(OreAttackTrace), false, this);
+		QueryParams.AddIgnoredActor(this);
+		const FCollisionShape AttackShape = FCollisionShape::MakeSphere(65.0f);
+
+		TArray<FHitResult> HitResults;
+		if (World->SweepMultiByChannel(HitResults, TraceStart, TraceEnd, FQuat::Identity, ECC_Visibility, AttackShape, QueryParams))
+		{
+			for (const FHitResult& HitResult : HitResults)
+			{
+				if (ApplyOreDamage(ResolveOreFromHit(HitResult)))
+				{
+					return;
+				}
+			}
+		}
+	}
+
+	const FVector CharacterLocation = GetActorLocation();
+	FVector AttackDirection = GetActorForwardVector();
+	if (AController* CurrentController = GetController())
+	{
+		FRotator ControlRotation = CurrentController->GetControlRotation();
+		ControlRotation.Pitch = 0.0f;
+		ControlRotation.Roll = 0.0f;
+		AttackDirection = ControlRotation.Vector().GetSafeNormal();
+	}
+
+	TArray<AActor*> OreActors;
+	UGameplayStatics::GetAllActorsOfClass(World, AOreStoneBase::StaticClass(), OreActors);
+
+	AOreStoneBase* BestOreTarget = nullptr;
+	float BestScore = -FLT_MAX;
+	const float CloseRangeOverride = FMath::Min(AttackRange, 220.0f);
+	for (AActor* OreActor : OreActors)
+	{
+		AOreStoneBase* OreStone = Cast<AOreStoneBase>(OreActor);
+		if (!OreStone || !OreStone->IsOreAvailable())
+		{
+			continue;
+		}
+
+		const FVector ToOre = OreStone->GetActorLocation() - CharacterLocation;
+		const float DistanceToOre = ToOre.Size();
+		if (DistanceToOre > AttackRange || DistanceToOre <= KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
+
+		const FVector ToOreDirection = ToOre.GetSafeNormal();
+		const float FacingDot = FVector::DotProduct(AttackDirection, ToOreDirection);
+		const bool bIsVeryCloseOre = DistanceToOre <= CloseRangeOverride;
+		if (!bIsVeryCloseOre && FacingDot < 0.15f)
+		{
+			continue;
+		}
+
+		const float Score = bIsVeryCloseOre
+			? 10.0f - (DistanceToOre / CloseRangeOverride)
+			: (FacingDot * 2.0f) - (DistanceToOre / AttackRange);
+		if (Score > BestScore)
+		{
+			BestScore = Score;
+			BestOreTarget = OreStone;
+		}
+	}
+
+	ApplyOreDamage(BestOreTarget);
+}
+
+void AGameplayCharacterBase::SyncAttachedVisualInputState()
+{
+	APlayerController* PlayerController = Cast<APlayerController>(GetController());
+	if (!PlayerController)
+	{
 		return;
 	}
 
-	if (UPrimitiveComponent* HitComponent = HitResult.GetComponent())
+	TArray<AActor*> AttachedActors;
+	GetAttachedActors(AttachedActors, true, true);
+	for (AActor* AttachedActor : AttachedActors)
 	{
-		if (AOreStoneBase* OreStoneOwner = Cast<AOreStoneBase>(HitComponent->GetOwner()))
+		if (!AttachedActor || AttachedActor == this)
 		{
-			const bool bWillBreak = OreStoneOwner->IsOreAvailable() && OreStoneOwner->GetCurrentHealth() <= OreDamage;
-			OreStoneOwner->ApplyDamageToOre(OreDamage);
-			if (bWillBreak && !OreStoneOwner->IsOreAvailable())
+			continue;
+		}
+
+		AttachedActor->DisableInput(PlayerController);
+	}
+
+	AttachPickaxeToAttachedVisual();
+}
+
+bool AGameplayCharacterBase::TriggerAttachedVisualAttack()
+{
+	static const FName PlayPickaxeAttackEventName(TEXT("PlayPickaxeAttack"));
+
+	TArray<AActor*> AttachedActors;
+	GetAttachedActors(AttachedActors, true, true);
+	bool bTriggeredVisualAttack = false;
+	for (AActor* AttachedActor : AttachedActors)
+	{
+		if (!AttachedActor || AttachedActor == this)
+		{
+			continue;
+		}
+
+		if (UFunction* PlayPickaxeAttackFunction = AttachedActor->FindFunction(PlayPickaxeAttackEventName))
+		{
+			AttachedActor->ProcessEvent(PlayPickaxeAttackFunction, nullptr);
+			bTriggeredVisualAttack = true;
+		}
+	}
+
+	return bTriggeredVisualAttack;
+}
+
+void AGameplayCharacterBase::AttachPickaxeToAttachedVisual()
+{
+	if (!EquippedPickaxeMesh)
+	{
+		return;
+	}
+
+	static const FName PickaxeComponentTag(TEXT("EquippedPickaxe"));
+	TArray<AActor*> AttachedActors;
+	GetAttachedActors(AttachedActors, true, true);
+
+	for (AActor* AttachedActor : AttachedActors)
+	{
+		if (!AttachedActor || AttachedActor == this)
+		{
+			continue;
+		}
+
+		USkeletalMeshComponent* TargetMeshComponent = nullptr;
+		TInlineComponentArray<USkeletalMeshComponent*> SkeletalMeshComponents(AttachedActor);
+		for (USkeletalMeshComponent* SkeletalMeshComponent : SkeletalMeshComponents)
+		{
+			if (!SkeletalMeshComponent)
 			{
-				AddOreResources(OreStoneOwner->GetOreResourceReward());
-				AddExperience(OreStoneOwner->GetOreExperienceReward());
+				continue;
+			}
+
+			if (SkeletalMeshComponent->GetName().Contains(TEXT("Manny")))
+			{
+				TargetMeshComponent = SkeletalMeshComponent;
+				break;
+			}
+
+			if (!TargetMeshComponent)
+			{
+				TargetMeshComponent = SkeletalMeshComponent;
 			}
 		}
+
+		if (!TargetMeshComponent)
+		{
+			continue;
+		}
+
+		FName ResolvedAttachSocket = PickaxeAttachSocketName;
+		if (!TargetMeshComponent->DoesSocketExist(ResolvedAttachSocket))
+		{
+			static const FName CandidateSockets[] =
+			{
+				TEXT("LeftHandThumb3"),
+				TEXT("LeftHand"),
+				TEXT("leftHand"),
+				TEXT("RightHand"),
+				TEXT("rightHand"),
+				TEXT("RightHandSocket"),
+				TEXT("weapon_r"),
+				TEXT("Weapon_R"),
+				TEXT("hand_r"),
+				TEXT("Hand_R"),
+				TEXT("ik_hand_r"),
+				TEXT("VB hand_r")
+			};
+
+			for (const FName CandidateSocket : CandidateSockets)
+			{
+				if (TargetMeshComponent->DoesSocketExist(CandidateSocket))
+				{
+					ResolvedAttachSocket = CandidateSocket;
+					break;
+				}
+			}
+		}
+
+		UStaticMeshComponent* PickaxeComponent = nullptr;
+		TInlineComponentArray<UStaticMeshComponent*> StaticMeshComponents(AttachedActor);
+		for (UStaticMeshComponent* StaticMeshComponent : StaticMeshComponents)
+		{
+			if (StaticMeshComponent && StaticMeshComponent->ComponentHasTag(PickaxeComponentTag))
+			{
+				PickaxeComponent = StaticMeshComponent;
+				break;
+			}
+		}
+
+		if (!PickaxeComponent)
+		{
+			PickaxeComponent = NewObject<UStaticMeshComponent>(AttachedActor, TEXT("EquippedPickaxe"));
+			if (!PickaxeComponent)
+			{
+				continue;
+			}
+
+			PickaxeComponent->ComponentTags.Add(PickaxeComponentTag);
+			PickaxeComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			PickaxeComponent->SetGenerateOverlapEvents(false);
+			PickaxeComponent->SetCanEverAffectNavigation(false);
+			PickaxeComponent->SetMobility(EComponentMobility::Movable);
+			AttachedActor->AddInstanceComponent(PickaxeComponent);
+			PickaxeComponent->RegisterComponent();
+		}
+
+		PickaxeComponent->SetStaticMesh(EquippedPickaxeMesh);
+		PickaxeComponent->SetVisibility(true, true);
+		PickaxeComponent->AttachToComponent(
+			TargetMeshComponent,
+			FAttachmentTransformRules::SnapToTargetIncludingScale,
+			ResolvedAttachSocket);
+		PickaxeComponent->SetRelativeLocation(PickaxeRelativeLocation);
+		PickaxeComponent->SetRelativeRotation(PickaxeRelativeRotation);
+		PickaxeComponent->SetRelativeScale3D(PickaxeRelativeScale);
 	}
 }
 
@@ -483,6 +819,7 @@ void AGameplayCharacterBase::LoadCharacterDataFromJson()
 	CurrentStamina = Stamina;
 	CollectedOreResources = FMath::Max(0, SaveData.CollectedOreResources);
 	CollectedGold = FMath::Max(0, SaveData.CollectedGold);
+	StaminaPotionCount = FMath::Max(0, SaveData.StaminaPotionCount);
 	PlayerLevel = FMath::Max(1, SaveData.PlayerLevel);
 	CurrentExperience = FMath::Max(0, SaveData.CurrentExperience);
 	ExperienceToNextLevel = FMath::Max(BaseExperienceToNextLevel, SaveData.ExperienceToNextLevel);
@@ -504,6 +841,7 @@ void AGameplayCharacterBase::SaveCharacterDataToJson() const
 	SaveData.CurrentStamina = FMath::Clamp(Stamina, 0.0f, MaxStamina);
 	SaveData.CollectedOreResources = CollectedOreResources;
 	SaveData.CollectedGold = CollectedGold;
+	SaveData.StaminaPotionCount = StaminaPotionCount;
 	SaveData.PlayerLevel = PlayerLevel;
 	SaveData.CurrentExperience = CurrentExperience;
 	SaveData.ExperienceToNextLevel = ExperienceToNextLevel;

@@ -10,33 +10,93 @@
 
 namespace
 {
-	const FLinearColor PanelBackgroundColor(0.02f, 0.02f, 0.02f, 0.82f);
-	const FLinearColor MenuOverlayColor(0.01f, 0.01f, 0.02f, 0.78f);
-	const FLinearColor PanelBorderColor(0.55f, 0.55f, 0.55f, 1.0f);
-	const FLinearColor SecondaryPanelColor(0.06f, 0.08f, 0.10f, 0.92f);
+	const FLinearColor PanelBackgroundColor(0.06f, 0.07f, 0.09f, 0.90f);
+	const FLinearColor MenuOverlayColor(0.02f, 0.02f, 0.04f, 0.82f);
+	const FLinearColor PanelBorderColor(0.68f, 0.56f, 0.34f, 0.98f);
+	const FLinearColor SecondaryPanelColor(0.11f, 0.13f, 0.16f, 0.95f);
 	const FLinearColor StaminaFillColor(0.12f, 0.80f, 0.18f, 1.0f);
-	const FLinearColor AccentColor(0.94f, 0.73f, 0.22f, 1.0f);
-	const FLinearColor PositiveColor(0.18f, 0.86f, 0.32f, 1.0f);
-	const FLinearColor MutedTextColor(0.76f, 0.80f, 0.84f, 1.0f);
-	const FLinearColor ButtonColor(0.10f, 0.12f, 0.16f, 0.94f);
-	const FLinearColor ButtonHoveredColor(0.18f, 0.24f, 0.30f, 0.98f);
-	const FLinearColor PrimaryButtonColor(0.20f, 0.44f, 0.24f, 0.96f);
-	const FLinearColor PrimaryButtonHoveredColor(0.26f, 0.58f, 0.30f, 1.0f);
-	const FLinearColor HeroPanelColor(0.08f, 0.12f, 0.16f, 0.92f);
-	const FLinearColor HighlightPanelColor(0.13f, 0.17f, 0.23f, 0.94f);
-	const FLinearColor DangerButtonColor(0.45f, 0.16f, 0.16f, 0.96f);
-	const FLinearColor DangerButtonHoveredColor(0.58f, 0.20f, 0.20f, 1.0f);
-	const FLinearColor ValueBarBackgroundColor(0.12f, 0.12f, 0.14f, 1.0f);
+	const FLinearColor AccentColor(0.90f, 0.68f, 0.27f, 1.0f);
+	const FLinearColor PositiveColor(0.43f, 0.74f, 0.55f, 1.0f);
+	const FLinearColor MutedTextColor(0.81f, 0.79f, 0.74f, 1.0f);
+	const FLinearColor ButtonColor(0.18f, 0.21f, 0.27f, 0.96f);
+	const FLinearColor ButtonHoveredColor(0.25f, 0.30f, 0.38f, 0.98f);
+	const FLinearColor PrimaryButtonColor(0.45f, 0.58f, 0.38f, 0.98f);
+	const FLinearColor PrimaryButtonHoveredColor(0.57f, 0.72f, 0.46f, 1.0f);
+	const FLinearColor HeroPanelColor(0.09f, 0.11f, 0.14f, 0.94f);
+	const FLinearColor HighlightPanelColor(0.13f, 0.16f, 0.20f, 0.96f);
+	const FLinearColor DangerButtonColor(0.50f, 0.22f, 0.18f, 0.98f);
+	const FLinearColor DangerButtonHoveredColor(0.64f, 0.28f, 0.22f, 1.0f);
+	const FLinearColor ValueBarBackgroundColor(0.10f, 0.09f, 0.08f, 1.0f);
+	const FLinearColor InnerFrameColor(0.07f, 0.09f, 0.12f, 0.98f);
+	const FLinearColor CopperShadowColor(0.18f, 0.10f, 0.04f, 0.35f);
+	const FLinearColor HeaderRibbonColor(0.16f, 0.12f, 0.08f, 0.96f);
 
 	void DrawPanel(UCanvas* Canvas, const FVector2D& Position, const FVector2D& Size, const FLinearColor& FillColor = PanelBackgroundColor)
 	{
+		if (!Canvas)
+		{
+			return;
+		}
+
+		const float Edge = FMath::Clamp(FMath::Min(Size.X, Size.Y) * 0.03f, 2.0f, 8.0f);
+		const FVector2D ShadowOffset(Edge * 0.65f, Edge * 0.85f);
+		FCanvasTileItem ShadowTile(Position + ShadowOffset, Size, CopperShadowColor);
+		ShadowTile.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(ShadowTile);
+
 		FCanvasTileItem BackgroundTile(Position, Size, FillColor);
 		BackgroundTile.BlendMode = SE_BLEND_Translucent;
 		Canvas->DrawItem(BackgroundTile);
 
+		const FVector2D InnerPosition = Position + FVector2D(Edge, Edge);
+		const FVector2D InnerSize = Size - FVector2D(Edge * 2.0f, Edge * 2.0f);
+		if (InnerSize.X > 0.0f && InnerSize.Y > 0.0f)
+		{
+			FCanvasTileItem InnerTile(InnerPosition, InnerSize, FLinearColor(FillColor.R + 0.015f, FillColor.G + 0.015f, FillColor.B + 0.02f, FillColor.A));
+			InnerTile.BlendMode = SE_BLEND_Translucent;
+			Canvas->DrawItem(InnerTile);
+		}
+
+		const bool bDecoratedPanel = Size.X >= 220.0f && Size.Y >= 88.0f;
+		if (bDecoratedPanel)
+		{
+			const float StripHeight = FMath::Clamp(Edge * 0.9f, 2.0f, 6.0f);
+			FCanvasTileItem AccentStrip(Position + FVector2D(0.0f, Edge * 0.35f), FVector2D(Size.X, StripHeight), AccentColor);
+			AccentStrip.BlendMode = SE_BLEND_Translucent;
+			Canvas->DrawItem(AccentStrip);
+
+			FCanvasTileItem HeaderGlow(Position + FVector2D(0.0f, Edge * 0.35f), FVector2D(Size.X, StripHeight * 3.0f), HeaderRibbonColor);
+			HeaderGlow.BlendMode = SE_BLEND_Translucent;
+			Canvas->DrawItem(HeaderGlow);
+		}
+
+		FCanvasBoxItem InnerBorder(InnerPosition, InnerSize);
+		InnerBorder.SetColor(FLinearColor(0.86f, 0.79f, 0.64f, 0.12f));
+		Canvas->DrawItem(InnerBorder);
+
 		FCanvasBoxItem BorderBox(Position, Size);
 		BorderBox.SetColor(PanelBorderColor);
 		Canvas->DrawItem(BorderBox);
+
+		if (Size.X >= 320.0f && Size.Y >= 120.0f)
+		{
+			const FVector2D RivetSize(FMath::Clamp(Edge * 1.15f, 4.0f, 8.0f), FMath::Clamp(Edge * 1.15f, 4.0f, 8.0f));
+			const float Inset = Edge + 3.0f;
+			const TArray<FVector2D> RivetPositions =
+			{
+				Position + FVector2D(Inset, Inset),
+				Position + FVector2D(Size.X - Inset - RivetSize.X, Inset),
+				Position + FVector2D(Inset, Size.Y - Inset - RivetSize.Y),
+				Position + FVector2D(Size.X - Inset - RivetSize.X, Size.Y - Inset - RivetSize.Y)
+			};
+
+			for (const FVector2D& RivetPosition : RivetPositions)
+			{
+				FCanvasTileItem RivetTile(RivetPosition, RivetSize, AccentColor);
+				RivetTile.BlendMode = SE_BLEND_Translucent;
+				Canvas->DrawItem(RivetTile);
+			}
+		}
 	}
 
 	void DrawTextLine(UCanvas* Canvas, UFont* Font, const FString& Text, const FVector2D& Position, const FLinearColor& Color, bool bCenterX = false, float Scale = 1.0f)
@@ -355,6 +415,26 @@ bool APlayerGameHUD::HandleClick(const FVector2D& ScreenPosition)
 	return false;
 }
 
+bool APlayerGameHUD::HandleScroll(float WheelDelta)
+{
+	AThiefPlayerController* ThiefController = GetThiefPlayerController();
+	if (!ThiefController
+		|| !ThiefController->IsSettingsMenuOpen()
+		|| ThiefController->GetActiveSettingsTab() != ESettingsPanelTab::Controls
+		|| ThiefController->IsWaitingForInputRebind()
+		|| ControlsBindingsMaxScroll <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	const float ScrollStep = 72.0f;
+	ControlsBindingsScrollOffset = FMath::Clamp(
+		ControlsBindingsScrollOffset + WheelDelta * ScrollStep,
+		0.0f,
+		ControlsBindingsMaxScroll);
+	return true;
+}
+
 void APlayerGameHUD::DrawMainMenu(float ViewportWidth, float ViewportHeight)
 {
 	UFont* LargeFont = GEngine ? GEngine->GetLargeFont() : nullptr;
@@ -371,7 +451,10 @@ void APlayerGameHUD::DrawMainMenu(float ViewportWidth, float ViewportHeight)
 		return;
 	}
 	const float MenuScale = ThiefController ? ThiefController->GetMenuScaleSetting() : 1.0f;
-	const float EffectiveScale = FMath::Min(MenuScale, FMath::Min(ViewportWidth / 1360.0f, ViewportHeight / 860.0f));
+	const float EffectiveScale = FMath::Clamp(
+		MenuScale * FMath::Min(ViewportWidth / 1920.0f, ViewportHeight / 1080.0f),
+		0.82f,
+		1.08f);
 	const float TextScale = FMath::Clamp(EffectiveScale, 0.72f, 1.0f);
 	const float SummaryScale = FMath::Clamp(TextScale * 0.88f, 0.64f, 0.94f);
 	const float FeatureDescriptionScale = FMath::Clamp(TextScale * 0.82f, 0.60f, 0.90f);
@@ -379,19 +462,23 @@ void APlayerGameHUD::DrawMainMenu(float ViewportWidth, float ViewportHeight)
 	Overlay.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Overlay);
 
-	const FVector2D PanelSize(1180.0f * EffectiveScale, 640.0f * EffectiveScale);
-	const FVector2D PanelPosition((ViewportWidth - PanelSize.X) * 0.5f, (ViewportHeight - PanelSize.Y) * 0.5f);
+	const float HorizontalMargin = FMath::Clamp(ViewportWidth * 0.035f, 24.0f, 72.0f);
+	const float VerticalMargin = FMath::Clamp(ViewportHeight * 0.04f, 24.0f, 60.0f);
+	const FVector2D PanelPosition(HorizontalMargin, VerticalMargin);
+	const FVector2D PanelSize(ViewportWidth - HorizontalMargin * 2.0f, ViewportHeight - VerticalMargin * 2.0f);
 	DrawPanel(Canvas, PanelPosition, PanelSize, FLinearColor(0.03f, 0.04f, 0.05f, 0.92f));
 
 	FCanvasTileItem AccentStrip(PanelPosition + FVector2D(0.0f, 0.0f), FVector2D(PanelSize.X, 10.0f * EffectiveScale), AccentColor);
 	AccentStrip.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(AccentStrip);
 
-	const FVector2D HeroSize(700.0f * EffectiveScale, PanelSize.Y - 72.0f * EffectiveScale);
+	const float InnerGap = 28.0f * EffectiveScale;
+	const float ActionPanelWidth = FMath::Clamp(PanelSize.X * 0.30f, 340.0f * EffectiveScale, 420.0f * EffectiveScale);
+	const FVector2D HeroSize(PanelSize.X - ActionPanelWidth - InnerGap - 64.0f * EffectiveScale, PanelSize.Y - 72.0f * EffectiveScale);
 	const FVector2D HeroPosition = PanelPosition + FVector2D(32.0f * EffectiveScale, 26.0f * EffectiveScale);
 	DrawPanel(Canvas, HeroPosition, HeroSize, HeroPanelColor);
 
-	const FVector2D ActionPanelSize(360.0f * EffectiveScale, HeroSize.Y);
+	const FVector2D ActionPanelSize(ActionPanelWidth, HeroSize.Y);
 	const FVector2D ActionPanelPosition = PanelPosition + FVector2D(PanelSize.X - ActionPanelSize.X - 32.0f * EffectiveScale, 26.0f * EffectiveScale);
 	DrawPanel(Canvas, ActionPanelPosition, ActionPanelSize, HighlightPanelColor);
 
@@ -604,39 +691,70 @@ void APlayerGameHUD::DrawPauseMenu(float ViewportWidth, float ViewportHeight)
 
 	const AThiefPlayerController* ThiefController = GetThiefPlayerController();
 	const float MenuScale = ThiefController ? ThiefController->GetMenuScaleSetting() : 1.0f;
-	const float EffectiveScale = FMath::Min(MenuScale, FMath::Min(ViewportWidth / 900.0f, ViewportHeight / 620.0f));
+	const float EffectiveScale = FMath::Clamp(
+		MenuScale * FMath::Min(ViewportWidth / 1920.0f, ViewportHeight / 1080.0f),
+		0.85f,
+		1.10f);
 	const float TextScale = FMath::Clamp(EffectiveScale, 0.82f, 1.0f);
 	FCanvasTileItem Overlay(FVector2D::ZeroVector, FVector2D(ViewportWidth, ViewportHeight), MenuOverlayColor);
 	Overlay.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Overlay);
 
-	const FVector2D PanelSize(640.0f * EffectiveScale, 390.0f * EffectiveScale);
-	const FVector2D PanelPosition((ViewportWidth - PanelSize.X) * 0.5f, (ViewportHeight - PanelSize.Y) * 0.5f);
+	const float HorizontalMargin = FMath::Clamp(ViewportWidth * 0.05f, 36.0f, 84.0f);
+	const float VerticalMargin = FMath::Clamp(ViewportHeight * 0.05f, 28.0f, 72.0f);
+	const FVector2D PanelPosition(HorizontalMargin, VerticalMargin);
+	const FVector2D PanelSize(ViewportWidth - HorizontalMargin * 2.0f, ViewportHeight - VerticalMargin * 2.0f);
 	DrawPanel(Canvas, PanelPosition, PanelSize, FLinearColor(0.03f, 0.04f, 0.05f, 0.94f));
+	FCanvasTileItem AccentStrip(PanelPosition, FVector2D(PanelSize.X, 10.0f * EffectiveScale), AccentColor);
+	AccentStrip.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(AccentStrip);
 
-	DrawTextLine(Canvas, LargeFont, LocalizeText(ThiefController, TEXT("Game Menu"), TEXT("Меню игры")), PanelPosition + FVector2D(PanelSize.X * 0.5f, 42.0f * EffectiveScale), AccentColor, true, TextScale);
+	DrawTextLine(Canvas, LargeFont, LocalizeText(ThiefController, TEXT("Game Menu"), TEXT("Меню игры")), PanelPosition + FVector2D(PanelSize.X * 0.5f, 48.0f * EffectiveScale), AccentColor, true, TextScale);
 	DrawTextLine(
 		Canvas,
 		MediumFont,
 		LocalizeText(ThiefController, TEXT("Pause gameplay, adjust settings or return to the lobby."), TEXT("Пауза, настройки и выход обратно в лобби.")),
-		PanelPosition + FVector2D(PanelSize.X * 0.5f, 90.0f * EffectiveScale),
+		PanelPosition + FVector2D(PanelSize.X * 0.5f, 100.0f * EffectiveScale),
 		FLinearColor::White,
 		true,
 		TextScale);
 
-	const FVector2D ButtonSize(300.0f * EffectiveScale, 52.0f * EffectiveScale);
-	const float ButtonStartX = PanelPosition.X + (PanelSize.X - ButtonSize.X) * 0.5f;
-	DrawMenuButton(LocalizeText(ThiefController, TEXT("Resume"), TEXT("Продолжить")), FVector2D(ButtonStartX, PanelPosition.Y + 142.0f * EffectiveScale), ButtonSize, EHUDMenuAction::ResumeGame, true);
-	DrawMenuButton(LocalizeText(ThiefController, TEXT("Settings"), TEXT("Настройки")), FVector2D(ButtonStartX, PanelPosition.Y + 208.0f * EffectiveScale), ButtonSize, EHUDMenuAction::OpenSettings);
-	DrawMenuButton(LocalizeText(ThiefController, TEXT("Exit To Lobby"), TEXT("Выйти в лобби")), FVector2D(ButtonStartX, PanelPosition.Y + 274.0f * EffectiveScale), ButtonSize, EHUDMenuAction::ReturnToLobby);
-	DrawMenuButton(LocalizeText(ThiefController, TEXT("Quit Game"), TEXT("Выйти из игры")), FVector2D(ButtonStartX, PanelPosition.Y + 340.0f * EffectiveScale), ButtonSize, EHUDMenuAction::QuitGame);
+	const FVector2D InfoPanelPosition = PanelPosition + FVector2D(40.0f * EffectiveScale, 160.0f * EffectiveScale);
+	const FVector2D InfoPanelSize(PanelSize.X * 0.48f, PanelSize.Y - 240.0f * EffectiveScale);
+	DrawPanel(Canvas, InfoPanelPosition, InfoPanelSize, HeroPanelColor);
+	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Session Control"), TEXT("Управление заходом")), InfoPanelPosition + FVector2D(24.0f * EffectiveScale, 22.0f * EffectiveScale), AccentColor, false, TextScale);
+	DrawWrappedTextBlock(
+		Canvas,
+		MediumFont,
+		LocalizeText(ThiefController, TEXT("Resume the run, jump into settings, or go back to the lobby without losing the current UI context."), TEXT("Продолжай забег, переходи в настройки или возвращайся в лобби без потери текущего контекста интерфейса.")),
+		InfoPanelPosition + FVector2D(24.0f * EffectiveScale, 62.0f * EffectiveScale),
+		InfoPanelSize.X - 48.0f * EffectiveScale,
+		FLinearColor::White,
+		TextScale);
+	DrawWrappedTextBlock(
+		Canvas,
+		MediumFont,
+		LocalizeText(ThiefController, TEXT("Esc closes menus, buttons work with the mouse, and the settings screen now uses the whole frame instead of a narrow modal."), TEXT("Esc закрывает меню, кнопки работают мышкой, а экран настроек теперь занимает почти весь кадр, а не узкое окно.")),
+		InfoPanelPosition + FVector2D(24.0f * EffectiveScale, 170.0f * EffectiveScale),
+		InfoPanelSize.X - 48.0f * EffectiveScale,
+		MutedTextColor,
+		TextScale);
+
+	const FVector2D ButtonSize(FMath::Min(420.0f * EffectiveScale, PanelSize.X * 0.32f), 62.0f * EffectiveScale);
+	const float ButtonStartX = PanelPosition.X + PanelSize.X - ButtonSize.X - 48.0f * EffectiveScale;
+	const float ButtonStartY = PanelPosition.Y + 188.0f * EffectiveScale;
+	DrawMenuButton(LocalizeText(ThiefController, TEXT("Resume"), TEXT("Продолжить")), FVector2D(ButtonStartX, ButtonStartY), ButtonSize, EHUDMenuAction::ResumeGame, true);
+	DrawMenuButton(LocalizeText(ThiefController, TEXT("Settings"), TEXT("Настройки")), FVector2D(ButtonStartX, ButtonStartY + 84.0f * EffectiveScale), ButtonSize, EHUDMenuAction::OpenSettings);
+	DrawMenuButton(LocalizeText(ThiefController, TEXT("Exit To Lobby"), TEXT("Выйти в лобби")), FVector2D(ButtonStartX, ButtonStartY + 168.0f * EffectiveScale), ButtonSize, EHUDMenuAction::ReturnToLobby);
+	DrawMenuButton(LocalizeText(ThiefController, TEXT("Quit Game"), TEXT("Выйти из игры")), FVector2D(ButtonStartX, ButtonStartY + 252.0f * EffectiveScale), ButtonSize, EHUDMenuAction::QuitGame);
 }
 
 void APlayerGameHUD::DrawSettingsPanel(float ViewportWidth, float ViewportHeight, bool bShowBackToPause)
 {
 	UFont* LargeFont = GEngine ? GEngine->GetLargeFont() : nullptr;
 	UFont* MediumFont = GEngine ? GEngine->GetMediumFont() : nullptr;
-	if (!LargeFont || !MediumFont)
+	UFont* SmallFont = GEngine ? GEngine->GetSmallFont() : nullptr;
+	if (!LargeFont || !MediumFont || !SmallFont)
 	{
 		return;
 	}
@@ -648,43 +766,61 @@ void APlayerGameHUD::DrawSettingsPanel(float ViewportWidth, float ViewportHeight
 	}
 
 	const float MenuScale = ThiefController->GetMenuScaleSetting();
-	const float EffectiveScale = FMath::Min(MenuScale, FMath::Min(ViewportWidth / 1280.0f, ViewportHeight / 880.0f));
+	const float EffectiveScale = FMath::Clamp(
+		MenuScale * FMath::Min(ViewportWidth / 1920.0f, ViewportHeight / 1080.0f),
+		0.85f,
+		1.08f);
 	FCanvasTileItem Overlay(FVector2D::ZeroVector, FVector2D(ViewportWidth, ViewportHeight), FLinearColor(0.01f, 0.01f, 0.02f, 0.88f));
 	Overlay.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Overlay);
 
-	const FVector2D PanelSize(1080.0f * EffectiveScale, 700.0f * EffectiveScale);
-	const FVector2D PanelPosition((ViewportWidth - PanelSize.X) * 0.5f, (ViewportHeight - PanelSize.Y) * 0.5f);
+	const float HorizontalMargin = FMath::Clamp(ViewportWidth * 0.035f, 24.0f, 72.0f);
+	const float VerticalMargin = FMath::Clamp(ViewportHeight * 0.04f, 24.0f, 60.0f);
+	const FVector2D PanelPosition(HorizontalMargin, VerticalMargin);
+	const FVector2D PanelSize(ViewportWidth - HorizontalMargin * 2.0f, ViewportHeight - VerticalMargin * 2.0f);
 	DrawPanel(Canvas, PanelPosition, PanelSize, FLinearColor(0.03f, 0.04f, 0.05f, 0.97f));
+	const float SidebarWidth = FMath::Clamp(PanelSize.X * 0.22f, 260.0f * EffectiveScale, 340.0f * EffectiveScale);
+	const FVector2D SidebarPosition = PanelPosition + FVector2D(18.0f * EffectiveScale, 18.0f * EffectiveScale);
+	const FVector2D SidebarSize(SidebarWidth, PanelSize.Y - 36.0f * EffectiveScale);
+	DrawPanel(Canvas, SidebarPosition, SidebarSize, HeroPanelColor);
 
-	DrawTextLine(Canvas, LargeFont, LocalizeText(ThiefController, TEXT("Settings"), TEXT("Настройки")), PanelPosition + FVector2D(PanelSize.X * 0.5f, 28.0f * EffectiveScale), AccentColor, true);
-	DrawTextLine(
+	DrawTextLine(Canvas, LargeFont, LocalizeText(ThiefController, TEXT("SETTINGS"), TEXT("НАСТРОЙКИ")), SidebarPosition + FVector2D(24.0f * EffectiveScale, 26.0f * EffectiveScale), AccentColor, false, 0.95f);
+	DrawWrappedTextBlock(
 		Canvas,
-		MediumFont,
-		LocalizeText(ThiefController, TEXT("Audio, controls and interface are all configurable from this lobby-driven settings hub."), TEXT("Звук, управление и интерфейс теперь настраиваются в одном общем экране.")),
-		PanelPosition + FVector2D(PanelSize.X * 0.5f, 70.0f * EffectiveScale),
+		SmallFont,
+		LocalizeText(ThiefController, TEXT("Tune sound, controls and interface from one unified command deck."), TEXT("Настрой звук, управление и интерфейс в одной общей командной панели.")),
+		SidebarPosition + FVector2D(24.0f * EffectiveScale, 78.0f * EffectiveScale),
+		SidebarSize.X - 48.0f * EffectiveScale,
 		FLinearColor::White,
-		true);
+		0.90f);
 
-	const FVector2D TabButtonSize(182.0f * EffectiveScale, 44.0f * EffectiveScale);
-	const float TabsStartX = PanelPosition.X + 34.0f * EffectiveScale;
-	const float TabsY = PanelPosition.Y + 108.0f * EffectiveScale;
-	DrawSettingsTabButton(LocalizeText(ThiefController, TEXT("Audio"), TEXT("Звук")), FVector2D(TabsStartX, TabsY), TabButtonSize, static_cast<int32>(ESettingsPanelTab::Audio), ThiefController->GetActiveSettingsTab() == ESettingsPanelTab::Audio);
-	DrawSettingsTabButton(LocalizeText(ThiefController, TEXT("Controls"), TEXT("Управление")), FVector2D(TabsStartX + 196.0f * EffectiveScale, TabsY), TabButtonSize, static_cast<int32>(ESettingsPanelTab::Controls), ThiefController->GetActiveSettingsTab() == ESettingsPanelTab::Controls);
-	DrawSettingsTabButton(LocalizeText(ThiefController, TEXT("Interface"), TEXT("Интерфейс")), FVector2D(TabsStartX + 392.0f * EffectiveScale, TabsY), TabButtonSize, static_cast<int32>(ESettingsPanelTab::Interface), ThiefController->GetActiveSettingsTab() == ESettingsPanelTab::Interface);
+	const FVector2D SidebarButtonSize(SidebarSize.X - 40.0f * EffectiveScale, 56.0f * EffectiveScale);
+	const float SidebarButtonsX = SidebarPosition.X + 20.0f * EffectiveScale;
+	const float SidebarButtonsY = SidebarPosition.Y + 164.0f * EffectiveScale;
+	DrawSidebarButton(LocalizeText(ThiefController, TEXT("Audio"), TEXT("Звук")), FVector2D(SidebarButtonsX, SidebarButtonsY), SidebarButtonSize, static_cast<int32>(ESettingsPanelTab::Audio), ThiefController->GetActiveSettingsTab() == ESettingsPanelTab::Audio);
+	DrawSidebarButton(LocalizeText(ThiefController, TEXT("Controls"), TEXT("Управление")), FVector2D(SidebarButtonsX, SidebarButtonsY + 70.0f * EffectiveScale), SidebarButtonSize, static_cast<int32>(ESettingsPanelTab::Controls), ThiefController->GetActiveSettingsTab() == ESettingsPanelTab::Controls);
+	DrawSidebarButton(LocalizeText(ThiefController, TEXT("Interface"), TEXT("Интерфейс")), FVector2D(SidebarButtonsX, SidebarButtonsY + 140.0f * EffectiveScale), SidebarButtonSize, static_cast<int32>(ESettingsPanelTab::Interface), ThiefController->GetActiveSettingsTab() == ESettingsPanelTab::Interface);
 
-	const FVector2D ContentPosition = PanelPosition + FVector2D(34.0f * EffectiveScale, 170.0f * EffectiveScale);
-	const float ContentWidth = PanelSize.X - 68.0f * EffectiveScale;
+	const FVector2D ContentPanelPosition = SidebarPosition + FVector2D(SidebarSize.X + 22.0f * EffectiveScale, 0.0f);
+	const FVector2D ContentPanelSize(PanelPosition.X + PanelSize.X - ContentPanelPosition.X - 18.0f * EffectiveScale, SidebarSize.Y);
+	DrawPanel(Canvas, ContentPanelPosition, ContentPanelSize, SecondaryPanelColor);
+
+	const FVector2D ContentPosition = ContentPanelPosition + FVector2D(28.0f * EffectiveScale, 28.0f * EffectiveScale);
+	const float ContentWidth = ContentPanelSize.X - 56.0f * EffectiveScale;
 	switch (ThiefController->GetActiveSettingsTab())
 	{
 	case ESettingsPanelTab::Audio:
+		ControlsBindingsScrollOffset = 0.0f;
+		ControlsBindingsMaxScroll = 0.0f;
 		DrawAudioSettingsSection(ThiefController, ContentPosition, ContentWidth, EffectiveScale);
 		break;
 	case ESettingsPanelTab::Controls:
-		DrawControlsSettingsSection(ThiefController, ContentPosition, ContentWidth, EffectiveScale);
+		DrawControlsSettingsSection(ThiefController, ContentPosition, ContentWidth, ContentPanelSize.Y - 56.0f * EffectiveScale, EffectiveScale);
 		break;
 	case ESettingsPanelTab::Interface:
 	default:
+		ControlsBindingsScrollOffset = 0.0f;
+		ControlsBindingsMaxScroll = 0.0f;
 		DrawInterfaceSettingsSection(ThiefController, ContentPosition, ContentWidth, EffectiveScale);
 		break;
 	}
@@ -693,8 +829,8 @@ void APlayerGameHUD::DrawSettingsPanel(float ViewportWidth, float ViewportHeight
 		bShowBackToPause
 			? LocalizeText(ThiefController, TEXT("Back"), TEXT("Назад"))
 			: LocalizeText(ThiefController, TEXT("Close"), TEXT("Закрыть")),
-		FVector2D(PanelPosition.X + PanelSize.X - 254.0f * EffectiveScale, PanelPosition.Y + PanelSize.Y - 78.0f * EffectiveScale),
-		FVector2D(220.0f * EffectiveScale, 50.0f * EffectiveScale),
+		SidebarPosition + FVector2D(20.0f * EffectiveScale, SidebarSize.Y - 72.0f * EffectiveScale),
+		FVector2D(SidebarSize.X - 40.0f * EffectiveScale, 52.0f * EffectiveScale),
 		EHUDMenuAction::CloseSettings,
 		true);
 
@@ -713,19 +849,21 @@ void APlayerGameHUD::DrawAudioSettingsSection(const AThiefPlayerController* Thie
 		return;
 	}
 
-	DrawPanel(Canvas, PanelPosition, FVector2D(PanelWidth, 420.0f * Scale), SecondaryPanelColor);
-	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Global Mix"), TEXT("Общий микс")), PanelPosition + FVector2D(24.0f * Scale, 18.0f * Scale), AccentColor);
+	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("AUDIO CONTROL DECK"), TEXT("ЗВУКОВАЯ ПАЛУБА")), PanelPosition, AccentColor);
 	DrawTextLine(
 		Canvas,
 		SmallFont,
 		LocalizeText(ThiefController, TEXT("Master affects the whole session, music controls the lobby track, SFX drives world and gameplay sounds."), TEXT("Master влияет на всю игру, Music управляет музыкой лобби, SFX отвечает за звуки мира и геймплея.")),
-		PanelPosition + FVector2D(24.0f * Scale, 48.0f * Scale),
+		PanelPosition + FVector2D(0.0f, 34.0f * Scale),
 		MutedTextColor);
+
+	const FVector2D CardPosition = PanelPosition + FVector2D(0.0f, 84.0f * Scale);
+	DrawPanel(Canvas, CardPosition, FVector2D(PanelWidth, 404.0f * Scale), HeroPanelColor);
 
 	DrawSettingValueRow(
 		LocalizeText(ThiefController, TEXT("Master Volume"), TEXT("Громкость Master")),
 		FString::Printf(TEXT("%d%%"), FMath::RoundToInt(ThiefController->GetMasterVolumeSetting() * 100.0f)),
-		PanelPosition + FVector2D(24.0f * Scale, 98.0f * Scale),
+		CardPosition + FVector2D(24.0f * Scale, 28.0f * Scale),
 		PanelWidth - 48.0f * Scale,
 		Scale,
 		EHUDMenuAction::MasterVolumeDown,
@@ -734,7 +872,7 @@ void APlayerGameHUD::DrawAudioSettingsSection(const AThiefPlayerController* Thie
 	DrawSettingValueRow(
 		LocalizeText(ThiefController, TEXT("Music Volume"), TEXT("Громкость музыки")),
 		FString::Printf(TEXT("%d%%"), FMath::RoundToInt(ThiefController->GetMusicVolumeSetting() * 100.0f)),
-		PanelPosition + FVector2D(24.0f * Scale, 192.0f * Scale),
+		CardPosition + FVector2D(24.0f * Scale, 126.0f * Scale),
 		PanelWidth - 48.0f * Scale,
 		Scale,
 		EHUDMenuAction::MusicDown,
@@ -743,7 +881,7 @@ void APlayerGameHUD::DrawAudioSettingsSection(const AThiefPlayerController* Thie
 	DrawSettingValueRow(
 		LocalizeText(ThiefController, TEXT("SFX Volume"), TEXT("Громкость эффектов")),
 		FString::Printf(TEXT("%d%%"), FMath::RoundToInt(ThiefController->GetSfxVolumeSetting() * 100.0f)),
-		PanelPosition + FVector2D(24.0f * Scale, 286.0f * Scale),
+		CardPosition + FVector2D(24.0f * Scale, 224.0f * Scale),
 		PanelWidth - 48.0f * Scale,
 		Scale,
 		EHUDMenuAction::SfxDown,
@@ -754,11 +892,11 @@ void APlayerGameHUD::DrawAudioSettingsSection(const AThiefPlayerController* Thie
 		Canvas,
 		SmallFont,
 		LocalizeText(ThiefController, TEXT("Tip: set your overall mix in the lobby before entering Showcase so the first run already feels right."), TEXT("Подсказка: выстави микс ещё в лобби, чтобы первый заход в Showcase уже был комфортным.")),
-		PanelPosition + FVector2D(24.0f * Scale, 380.0f * Scale),
+		CardPosition + FVector2D(24.0f * Scale, 336.0f * Scale),
 		MutedTextColor);
 }
 
-void APlayerGameHUD::DrawControlsSettingsSection(const AThiefPlayerController* ThiefController, const FVector2D& PanelPosition, float PanelWidth, float Scale)
+void APlayerGameHUD::DrawControlsSettingsSection(const AThiefPlayerController* ThiefController, const FVector2D& PanelPosition, float PanelWidth, float PanelHeight, float Scale)
 {
 	UFont* MediumFont = GEngine ? GEngine->GetMediumFont() : nullptr;
 	UFont* SmallFont = GEngine ? GEngine->GetSmallFont() : nullptr;
@@ -766,36 +904,6 @@ void APlayerGameHUD::DrawControlsSettingsSection(const AThiefPlayerController* T
 	{
 		return;
 	}
-
-	DrawPanel(Canvas, PanelPosition, FVector2D(PanelWidth, 500.0f * Scale), SecondaryPanelColor);
-	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Full Control Rebind"), TEXT("Полное переназначение клавиш")), PanelPosition + FVector2D(24.0f * Scale, 18.0f * Scale), AccentColor);
-	DrawTextLine(
-		Canvas,
-		SmallFont,
-		LocalizeText(ThiefController, TEXT("Click a binding, then press the new key. Escape cancels the capture overlay."), TEXT("Нажми на кнопку с клавишей, затем введи новую. Escape отменяет режим захвата.")),
-		PanelPosition + FVector2D(24.0f * Scale, 48.0f * Scale),
-		MutedTextColor);
-
-	DrawSettingValueRow(
-		LocalizeText(ThiefController, TEXT("Mouse Sensitivity"), TEXT("Чувствительность мыши")),
-		FString::Printf(TEXT("%.2f"), ThiefController->GetLookSensitivitySetting()),
-		PanelPosition + FVector2D(24.0f * Scale, 92.0f * Scale),
-		PanelWidth - 48.0f * Scale,
-		Scale,
-		EHUDMenuAction::LookSensitivityDown,
-		EHUDMenuAction::LookSensitivityUp,
-		(ThiefController->GetLookSensitivitySetting() - 0.02f) / (0.20f - 0.02f));
-
-	const FVector2D ToggleSize(220.0f * Scale, 44.0f * Scale);
-	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Invert Y"), TEXT("Инверсия Y")), PanelPosition + FVector2D(24.0f * Scale, 194.0f * Scale), FLinearColor::White);
-	DrawMenuButton(
-		ThiefController->IsLookYInverted()
-			? LocalizeText(ThiefController, TEXT("Enabled"), TEXT("Включено"))
-			: LocalizeText(ThiefController, TEXT("Disabled"), TEXT("Выключено")),
-		PanelPosition + FVector2D(PanelWidth - ToggleSize.X - 24.0f * Scale, 176.0f * Scale),
-		ToggleSize,
-		EHUDMenuAction::ToggleInvertLookY,
-		ThiefController->IsLookYInverted());
 
 	const TArray<ERemappableInputAction> Bindings =
 	{
@@ -808,6 +916,7 @@ void APlayerGameHUD::DrawControlsSettingsSection(const AThiefPlayerController* T
 		ERemappableInputAction::Attack,
 		ERemappableInputAction::Interact,
 		ERemappableInputAction::ToggleTradeMenu,
+		ERemappableInputAction::UsePotion,
 		ERemappableInputAction::ToggleProgressionMenu,
 		ERemappableInputAction::MenuConfirm,
 		ERemappableInputAction::MenuBack,
@@ -816,23 +925,109 @@ void APlayerGameHUD::DrawControlsSettingsSection(const AThiefPlayerController* T
 		ERemappableInputAction::MenuOptionThree
 	};
 
-	const float ColumnGap = 18.0f * Scale;
-	const float RowGap = 10.0f * Scale;
-	const FVector2D RowSize((PanelWidth - 48.0f * Scale - ColumnGap) * 0.5f, 58.0f * Scale);
+	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("CONTROL DECK"), TEXT("КОНСОЛЬ УПРАВЛЕНИЯ")), PanelPosition, AccentColor);
+	DrawTextLine(
+		Canvas,
+		SmallFont,
+		LocalizeText(ThiefController, TEXT("Scroll the list with the wheel, click the key slot to rebind, Escape cancels capture."), TEXT("Листай список колёсиком, жми на слот клавиши для смены бинда, Escape отменяет захват.")),
+		PanelPosition + FVector2D(0.0f, 34.0f * Scale),
+		MutedTextColor);
+
+	const FVector2D InputCardPosition = PanelPosition + FVector2D(0.0f, 78.0f * Scale);
+	const FVector2D InputCardSize(PanelWidth, 118.0f * Scale);
+	FCanvasTileItem InputCard(InputCardPosition, InputCardSize, FLinearColor(0.10f, 0.12f, 0.15f, 0.92f));
+	InputCard.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(InputCard);
+	FCanvasTileItem InputAccent(InputCardPosition + FVector2D(0.0f, 0.0f), FVector2D(InputCardSize.X, 3.0f * Scale), AccentColor);
+	InputAccent.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(InputAccent);
+	DrawTextLine(Canvas, SmallFont, LocalizeText(ThiefController, TEXT("LOOK AND INPUT"), TEXT("КАМЕРА И ВВОД")), InputCardPosition + FVector2D(18.0f * Scale, 14.0f * Scale), AccentColor);
+
+	DrawSettingValueRow(
+		LocalizeText(ThiefController, TEXT("Mouse Sensitivity"), TEXT("Чувствительность мыши")),
+		FString::Printf(TEXT("%.2f"), ThiefController->GetLookSensitivitySetting()),
+		InputCardPosition + FVector2D(18.0f * Scale, 28.0f * Scale),
+		PanelWidth - 36.0f * Scale,
+		Scale,
+		EHUDMenuAction::LookSensitivityDown,
+		EHUDMenuAction::LookSensitivityUp,
+		(ThiefController->GetLookSensitivitySetting() - 0.02f) / (0.20f - 0.02f));
+
+	const FVector2D ToggleSize(220.0f * Scale, 44.0f * Scale);
+	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Invert Y"), TEXT("Инверсия Y")), InputCardPosition + FVector2D(18.0f * Scale, 84.0f * Scale), FLinearColor::White);
+	DrawMenuButton(
+		ThiefController->IsLookYInverted()
+			? LocalizeText(ThiefController, TEXT("Enabled"), TEXT("Включено"))
+			: LocalizeText(ThiefController, TEXT("Disabled"), TEXT("Выключено")),
+		InputCardPosition + FVector2D(PanelWidth - ToggleSize.X - 18.0f * Scale, 66.0f * Scale),
+		ToggleSize,
+		EHUDMenuAction::ToggleInvertLookY,
+		ThiefController->IsLookYInverted());
+
+	const FVector2D BindingsPanelPosition = InputCardPosition + FVector2D(0.0f, InputCardSize.Y + 18.0f * Scale);
+	const float BindingsPanelHeight = FMath::Max(280.0f * Scale, PanelHeight - (BindingsPanelPosition.Y - PanelPosition.Y) - 12.0f * Scale);
+	const FVector2D BindingsPanelSize(PanelWidth, BindingsPanelHeight);
+	FCanvasTileItem BindingsPanel(BindingsPanelPosition, BindingsPanelSize, FLinearColor(0.09f, 0.11f, 0.14f, 0.94f));
+	BindingsPanel.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(BindingsPanel);
+	FCanvasTileItem BindingsAccent(BindingsPanelPosition + FVector2D(0.0f, 0.0f), FVector2D(BindingsPanelSize.X, 3.0f * Scale), AccentColor);
+	BindingsAccent.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(BindingsAccent);
+	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("BIND LIST"), TEXT("СПИСОК БИНДОВ")), BindingsPanelPosition + FVector2D(18.0f * Scale, 16.0f * Scale), AccentColor);
+	DrawTextLine(
+		Canvas,
+		SmallFont,
+		LocalizeText(ThiefController, TEXT("Movement, combat and fast menu keys are shown as a single scrollable command list."), TEXT("Передвижение, бой и быстрые меню собраны в один общий прокручиваемый список.")),
+		BindingsPanelPosition + FVector2D(18.0f * Scale, 44.0f * Scale),
+		MutedTextColor);
+
+	const FVector2D ResetButtonSize(220.0f * Scale, 40.0f * Scale);
+	const float ViewportTop = BindingsPanelPosition.Y + 78.0f * Scale;
+	const float ViewportBottom = BindingsPanelPosition.Y + BindingsPanelHeight - 64.0f * Scale;
+	const float ViewportHeight = FMath::Max(140.0f * Scale, ViewportBottom - ViewportTop);
+	const float ScrollbarWidth = 12.0f * Scale;
+	const float ListWidth = PanelWidth - 36.0f * Scale - ScrollbarWidth - 10.0f * Scale;
+	const FVector2D RowSize(ListWidth, 52.0f * Scale);
+	const float RowGap = 8.0f * Scale;
+	const float ContentHeight = static_cast<float>(Bindings.Num()) * (RowSize.Y + RowGap) - RowGap;
+	ControlsBindingsMaxScroll = FMath::Max(0.0f, ContentHeight - ViewportHeight);
+	ControlsBindingsScrollOffset = FMath::Clamp(ControlsBindingsScrollOffset, 0.0f, ControlsBindingsMaxScroll);
+
 	for (int32 Index = 0; Index < Bindings.Num(); ++Index)
 	{
-		const int32 Column = Index % 2;
-		const int32 Row = Index / 2;
-		const FVector2D RowPosition =
-			PanelPosition
-			+ FVector2D(24.0f * Scale + Column * (RowSize.X + ColumnGap), 244.0f * Scale + Row * (RowSize.Y + RowGap));
-		DrawBindingRow(ThiefController, RowPosition, RowSize, Bindings[Index]);
+		const float RowY = ViewportTop + static_cast<float>(Index) * (RowSize.Y + RowGap) - ControlsBindingsScrollOffset;
+		if ((RowY + RowSize.Y) < ViewportTop || RowY > ViewportBottom)
+		{
+			continue;
+		}
+
+		DrawBindingRow(
+			ThiefController,
+			FVector2D(BindingsPanelPosition.X + 18.0f * Scale, RowY),
+			RowSize,
+			Bindings[Index]);
+	}
+
+	if (ControlsBindingsMaxScroll > KINDA_SMALL_NUMBER)
+	{
+		const FVector2D ScrollTrackPosition(BindingsPanelPosition.X + PanelWidth - 18.0f * Scale - ScrollbarWidth, ViewportTop);
+		const FVector2D ScrollTrackSize(ScrollbarWidth, ViewportHeight);
+		FCanvasTileItem ScrollTrack(ScrollTrackPosition, ScrollTrackSize, FLinearColor(0.15f, 0.17f, 0.21f, 0.9f));
+		ScrollTrack.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(ScrollTrack);
+
+		const float ThumbHeight = FMath::Max(48.0f * Scale, ViewportHeight * (ViewportHeight / ContentHeight));
+		const float ThumbTravel = FMath::Max(0.0f, ViewportHeight - ThumbHeight);
+		const float ThumbOffset = ThumbTravel * (ControlsBindingsScrollOffset / ControlsBindingsMaxScroll);
+		FCanvasTileItem ScrollThumb(ScrollTrackPosition + FVector2D(0.0f, ThumbOffset), FVector2D(ScrollbarWidth, ThumbHeight), AccentColor);
+		ScrollThumb.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(ScrollThumb);
 	}
 
 	DrawMenuButton(
 		LocalizeText(ThiefController, TEXT("Reset Controls"), TEXT("Сбросить управление")),
-		PanelPosition + FVector2D(PanelWidth - 244.0f * Scale, 442.0f * Scale),
-		FVector2D(220.0f * Scale, 40.0f * Scale),
+		BindingsPanelPosition + FVector2D(PanelWidth - ResetButtonSize.X - 18.0f * Scale, BindingsPanelHeight - ResetButtonSize.Y - 14.0f * Scale),
+		ResetButtonSize,
 		EHUDMenuAction::ResetControls);
 }
 
@@ -845,41 +1040,43 @@ void APlayerGameHUD::DrawInterfaceSettingsSection(const AThiefPlayerController* 
 		return;
 	}
 
-	DrawPanel(Canvas, PanelPosition, FVector2D(PanelWidth, 360.0f * Scale), SecondaryPanelColor);
-	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Interface"), TEXT("Интерфейс")), PanelPosition + FVector2D(24.0f * Scale, 18.0f * Scale), AccentColor);
+	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("INTERFACE TUNING"), TEXT("НАСТРОЙКА ИНТЕРФЕЙСА")), PanelPosition, AccentColor);
 	DrawTextLine(
 		Canvas,
 		SmallFont,
 		LocalizeText(ThiefController, TEXT("Keep the menu readable while preserving the gameplay frame behind it."), TEXT("Настрой масштаб и язык так, чтобы интерфейс был читаемым, но не перегружал кадр.")),
-		PanelPosition + FVector2D(24.0f * Scale, 48.0f * Scale),
+		PanelPosition + FVector2D(0.0f, 34.0f * Scale),
 		MutedTextColor);
+
+	const FVector2D CardPosition = PanelPosition + FVector2D(0.0f, 84.0f * Scale);
+	DrawPanel(Canvas, CardPosition, FVector2D(PanelWidth, 320.0f * Scale), HeroPanelColor);
 
 	DrawSettingValueRow(
 		LocalizeText(ThiefController, TEXT("Menu Scale"), TEXT("Масштаб меню")),
 		FString::Printf(TEXT("%.2f"), ThiefController->GetMenuScaleSetting()),
-		PanelPosition + FVector2D(24.0f * Scale, 100.0f * Scale),
+		CardPosition + FVector2D(24.0f * Scale, 28.0f * Scale),
 		PanelWidth - 48.0f * Scale,
 		Scale,
 		EHUDMenuAction::MenuScaleDown,
 		EHUDMenuAction::MenuScaleUp,
 		(ThiefController->GetMenuScaleSetting() - 0.85f) / (1.25f - 0.85f));
 
-	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Language"), TEXT("Язык")), PanelPosition + FVector2D(24.0f * Scale, 214.0f * Scale), FLinearColor::White);
-	DrawMenuButton(TEXT("<"), PanelPosition + FVector2D(PanelWidth - 196.0f * Scale, 194.0f * Scale), FVector2D(54.0f * Scale, 44.0f * Scale), EHUDMenuAction::LanguagePrev);
-	DrawMenuButton(TEXT(">"), PanelPosition + FVector2D(PanelWidth - 68.0f * Scale, 194.0f * Scale), FVector2D(54.0f * Scale, 44.0f * Scale), EHUDMenuAction::LanguageNext, true);
-	DrawPanel(Canvas, PanelPosition + FVector2D(PanelWidth - 136.0f * Scale, 194.0f * Scale), FVector2D(60.0f * Scale, 44.0f * Scale), HighlightPanelColor);
+	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Language"), TEXT("Язык")), CardPosition + FVector2D(24.0f * Scale, 144.0f * Scale), FLinearColor::White);
+	DrawMenuButton(TEXT("<"), CardPosition + FVector2D(PanelWidth - 196.0f * Scale, 124.0f * Scale), FVector2D(54.0f * Scale, 44.0f * Scale), EHUDMenuAction::LanguagePrev);
+	DrawMenuButton(TEXT(">"), CardPosition + FVector2D(PanelWidth - 68.0f * Scale, 124.0f * Scale), FVector2D(54.0f * Scale, 44.0f * Scale), EHUDMenuAction::LanguageNext, true);
+	DrawPanel(Canvas, CardPosition + FVector2D(PanelWidth - 136.0f * Scale, 124.0f * Scale), FVector2D(60.0f * Scale, 44.0f * Scale), HighlightPanelColor);
 	DrawTextLine(
 		Canvas,
 		MediumFont,
 		ThiefController->GetCurrentLanguage() == EGameLanguage::Russian ? TEXT("RU") : TEXT("EN"),
-		PanelPosition + FVector2D(PanelWidth - 112.0f * Scale, 206.0f * Scale),
+		CardPosition + FVector2D(PanelWidth - 112.0f * Scale, 136.0f * Scale),
 		FLinearColor::White);
 
 	DrawTextLine(
 		Canvas,
 		SmallFont,
 		LocalizeText(ThiefController, TEXT("Language and scale are saved together with audio and control settings."), TEXT("Язык и масштаб сохраняются вместе со звуком и управлением.")),
-		PanelPosition + FVector2D(24.0f * Scale, 284.0f * Scale),
+		CardPosition + FVector2D(24.0f * Scale, 236.0f * Scale),
 		MutedTextColor);
 }
 
@@ -898,7 +1095,38 @@ void APlayerGameHUD::DrawSettingsTabButton(const FString& Label, const FVector2D
 		: (bHovered ? ButtonHoveredColor : ButtonColor);
 
 	DrawPanel(Canvas, Position, Size, FillColor);
-	DrawTextLine(Canvas, Font, Label, Position + FVector2D(18.0f, (Size.Y * 0.5f) - 10.0f), bSelected ? FLinearColor::Black : FLinearColor::White);
+	if (!bSelected)
+	{
+		FCanvasTileItem AccentBand(Position + FVector2D(0.0f, Size.Y - 6.0f), FVector2D(Size.X, 6.0f), FLinearColor(0.34f, 0.25f, 0.11f, 0.95f));
+		AccentBand.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(AccentBand);
+	}
+	DrawTextLine(Canvas, Font, Label, Position + FVector2D(18.0f, (Size.Y * 0.5f) - 10.0f), bSelected ? FLinearColor::Black : FLinearColor(0.95f, 0.92f, 0.84f, 1.0f));
+}
+
+void APlayerGameHUD::DrawSidebarButton(const FString& Label, const FVector2D& Position, const FVector2D& Size, int32 TabIndex, bool bSelected)
+{
+	UFont* Font = GEngine ? GEngine->GetMediumFont() : nullptr;
+	if (!Font)
+	{
+		return;
+	}
+
+	RegisterButton(EHUDMenuAction::SelectSettingsTab, Position, Size, TabIndex);
+	const bool bHovered = IsButtonHovered(ActiveButtons.Last());
+	const FLinearColor FillColor = bSelected
+		? AccentColor
+		: (bHovered ? FLinearColor(0.19f, 0.23f, 0.30f, 0.98f) : FLinearColor(0.12f, 0.15f, 0.19f, 0.96f));
+	DrawPanel(Canvas, Position, Size, FillColor);
+
+	if (!bSelected)
+	{
+		FCanvasTileItem LeftAccent(Position + FVector2D(0.0f, 0.0f), FVector2D(6.0f, Size.Y), FLinearColor(0.34f, 0.25f, 0.11f, 0.95f));
+		LeftAccent.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(LeftAccent);
+	}
+
+	DrawTextLine(Canvas, Font, Label, Position + FVector2D(22.0f, (Size.Y * 0.5f) - 10.0f), bSelected ? FLinearColor::Black : FLinearColor(0.95f, 0.92f, 0.84f, 1.0f));
 }
 
 void APlayerGameHUD::DrawSettingValueRow(
@@ -918,51 +1146,88 @@ void APlayerGameHUD::DrawSettingValueRow(
 		return;
 	}
 
-	const FVector2D RowSize(RowWidth, 74.0f * Scale);
-	DrawPanel(Canvas, Position, RowSize, HighlightPanelColor);
+	const FVector2D RowSize(RowWidth, 58.0f * Scale);
+	FCanvasTileItem RowBackground(Position, RowSize, FLinearColor(0.14f, 0.16f, 0.19f, 0.92f));
+	RowBackground.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(RowBackground);
+	FCanvasTileItem RowAccent(Position + FVector2D(0.0f, RowSize.Y - 2.0f * Scale), FVector2D(RowSize.X, 2.0f * Scale), FLinearColor(0.86f, 0.79f, 0.64f, 0.18f));
+	RowAccent.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(RowAccent);
 
-	DrawTextLine(Canvas, MediumFont, Label, Position + FVector2D(18.0f * Scale, 12.0f * Scale), FLinearColor::White);
-	DrawTextLine(Canvas, SmallFont, ValueText, Position + FVector2D(18.0f * Scale, 40.0f * Scale), MutedTextColor);
+	DrawTextLine(Canvas, MediumFont, Label, Position + FVector2D(14.0f * Scale, 8.0f * Scale), FLinearColor::White);
+	DrawTextLine(Canvas, SmallFont, ValueText, Position + FVector2D(14.0f * Scale, 33.0f * Scale), AccentColor);
 
-	const FVector2D BarPosition = Position + FVector2D(220.0f * Scale, 28.0f * Scale);
-	const FVector2D BarSize(RowWidth - 384.0f * Scale, 16.0f * Scale);
+	const FVector2D BarPosition = Position + FVector2D(210.0f * Scale, 22.0f * Scale);
+	const FVector2D BarSize(RowWidth - 344.0f * Scale, 12.0f * Scale);
 	FCanvasTileItem BarBackground(BarPosition, BarSize, ValueBarBackgroundColor);
 	BarBackground.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(BarBackground);
 
-	FCanvasTileItem BarFill(BarPosition, FVector2D(BarSize.X * FMath::Clamp(NormalizedValue, 0.0f, 1.0f), BarSize.Y), AccentColor);
+	const float ClampedValue = FMath::Clamp(NormalizedValue, 0.0f, 1.0f);
+	FCanvasTileItem BarFill(BarPosition, FVector2D(BarSize.X * ClampedValue, BarSize.Y), AccentColor);
 	BarFill.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(BarFill);
 
-	const FVector2D ButtonSize(52.0f * Scale, 42.0f * Scale);
-	const float ButtonsX = Position.X + RowWidth - 136.0f * Scale;
-	DrawMenuButton(TEXT("-"), FVector2D(ButtonsX, Position.Y + 16.0f * Scale), ButtonSize, DecreaseAction);
-	DrawMenuButton(TEXT("+"), FVector2D(ButtonsX + 66.0f * Scale, Position.Y + 16.0f * Scale), ButtonSize, IncreaseAction, true);
+	const FVector2D KnobSize(10.0f * Scale, 22.0f * Scale);
+	FCanvasTileItem SliderKnob(
+		FVector2D(BarPosition.X + BarSize.X * ClampedValue - KnobSize.X * 0.5f, BarPosition.Y - 5.0f * Scale),
+		KnobSize,
+		FLinearColor(0.96f, 0.91f, 0.78f, 1.0f));
+	SliderKnob.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(SliderKnob);
+
+	const FVector2D ButtonSize(40.0f * Scale, 36.0f * Scale);
+	const float ButtonsX = Position.X + RowWidth - 96.0f * Scale;
+	DrawMenuButton(TEXT("-"), FVector2D(ButtonsX, Position.Y + 11.0f * Scale), ButtonSize, DecreaseAction);
+	DrawMenuButton(TEXT("+"), FVector2D(ButtonsX + 46.0f * Scale, Position.Y + 11.0f * Scale), ButtonSize, IncreaseAction, true);
 }
 
 void APlayerGameHUD::DrawBindingRow(const AThiefPlayerController* ThiefController, const FVector2D& Position, const FVector2D& Size, const ERemappableInputAction InputAction)
 {
 	UFont* MediumFont = GEngine ? GEngine->GetMediumFont() : nullptr;
-	UFont* SmallFont = GEngine ? GEngine->GetSmallFont() : nullptr;
-	if (!ThiefController || !MediumFont || !SmallFont)
+	if (!ThiefController || !MediumFont)
 	{
 		return;
 	}
 
 	const bool bPending = ThiefController->IsWaitingForInputRebind() && ThiefController->GetPendingInputRebindAction() == InputAction;
-	DrawPanel(Canvas, Position, Size, bPending ? FLinearColor(0.18f, 0.20f, 0.10f, 0.96f) : FLinearColor(0.07f, 0.09f, 0.12f, 0.96f));
-	DrawTextLine(Canvas, MediumFont, ThiefController->GetInputActionDisplayName(InputAction).ToString(), Position + FVector2D(16.0f, 8.0f), FLinearColor::White);
-	DrawTextLine(Canvas, SmallFont, ThiefController->GetInputActionDescription(InputAction).ToString(), Position + FVector2D(16.0f, 30.0f), MutedTextColor);
+	RegisterButton(EHUDMenuAction::BeginInputRebind, Position, Size, static_cast<int32>(InputAction));
+	const bool bHovered = IsButtonHovered(ActiveButtons.Last());
+	const FLinearColor RowColor = bPending
+		? FLinearColor(0.23f, 0.18f, 0.07f, 0.98f)
+		: (bHovered ? FLinearColor(0.17f, 0.20f, 0.25f, 0.96f) : FLinearColor(0.12f, 0.14f, 0.17f, 0.88f));
+	FCanvasTileItem RowBackground(Position, Size, RowColor);
+	RowBackground.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(RowBackground);
+	FCanvasTileItem RowSeparator(Position + FVector2D(0.0f, Size.Y - 1.0f), FVector2D(Size.X, 1.0f), bPending ? AccentColor : FLinearColor(0.86f, 0.79f, 0.64f, 0.12f));
+	RowSeparator.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(RowSeparator);
 
-	const FVector2D ButtonSize(132.0f, Size.Y - 14.0f);
-	const FVector2D ButtonPosition = Position + FVector2D(Size.X - ButtonSize.X - 8.0f, 7.0f);
-	DrawMenuButton(
-		ThiefController->GetInputActionKeyText(InputAction).ToString(),
-		ButtonPosition,
-		ButtonSize,
-		EHUDMenuAction::BeginInputRebind,
-		bPending,
-		static_cast<int32>(InputAction));
+	const FVector2D ButtonSize(FMath::Clamp(Size.X * 0.24f, 120.0f, 168.0f), Size.Y - 12.0f);
+	const FVector2D ButtonPosition = Position + FVector2D(Size.X - ButtonSize.X - 10.0f, 6.0f);
+	DrawWrappedTextBlock(
+		Canvas,
+		MediumFont,
+		ThiefController->GetInputActionDisplayName(InputAction).ToString(),
+		Position + FVector2D(14.0f, 15.0f),
+		Size.X - ButtonSize.X - 30.0f,
+		bPending ? AccentColor : FLinearColor::White,
+		0.82f,
+		1.0f);
+
+	FCanvasTileItem KeycapBackground(ButtonPosition, ButtonSize, bPending ? AccentColor : FLinearColor(0.30f, 0.34f, 0.42f, 0.95f));
+	KeycapBackground.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(KeycapBackground);
+	FCanvasBoxItem KeycapBorder(ButtonPosition, ButtonSize);
+	KeycapBorder.SetColor(bPending ? FLinearColor::Black : FLinearColor(0.92f, 0.90f, 0.84f, 0.52f));
+	Canvas->DrawItem(KeycapBorder);
+	DrawTextLine(
+		Canvas,
+		MediumFont,
+		GetCompactKeyLabel(ThiefController->GetInputActionKeyText(InputAction)),
+		ButtonPosition + FVector2D(ButtonSize.X * 0.5f, 12.0f),
+		bPending ? FLinearColor::Black : FLinearColor::White,
+		true);
 }
 
 void APlayerGameHUD::DrawInputCaptureOverlay(const AThiefPlayerController* ThiefController, float ViewportWidth, float ViewportHeight)
@@ -1012,6 +1277,8 @@ void APlayerGameHUD::DrawResourcePanel(float ViewportWidth) const
 	float OreTextHeight = 0.0f;
 	float GoldTextWidth = 0.0f;
 	float GoldTextHeight = 0.0f;
+	float PotionTextWidth = 0.0f;
+	float PotionTextHeight = 0.0f;
 	const AThiefPlayerController* ThiefController = GetThiefPlayerController();
 	const FString OreText = ThiefController && ThiefController->IsRussianLanguage()
 		? FString::Printf(TEXT("Руда: %d"), PlayerCharacter->CollectedOreResources)
@@ -1019,14 +1286,23 @@ void APlayerGameHUD::DrawResourcePanel(float ViewportWidth) const
 	const FString GoldText = ThiefController && ThiefController->IsRussianLanguage()
 		? FString::Printf(TEXT("Золото: %d"), PlayerCharacter->GetCollectedGold())
 		: FString::Printf(TEXT("Gold: %d"), PlayerCharacter->GetCollectedGold());
+	const FString PotionKeyLabel = ThiefController
+		? GetCompactKeyLabel(ThiefController->GetInputActionKeyText(ERemappableInputAction::UsePotion))
+		: TEXT("Q");
+	const FString PotionText = ThiefController && ThiefController->IsRussianLanguage()
+		? FString::Printf(TEXT("Зелья [%s]: %d"), *PotionKeyLabel, PlayerCharacter->GetStaminaPotionCount())
+		: FString::Printf(TEXT("Potions [%s]: %d"), *PotionKeyLabel, PlayerCharacter->GetStaminaPotionCount());
 	Canvas->StrLen(Font, OreText, OreTextWidth, OreTextHeight);
 	Canvas->StrLen(Font, GoldText, GoldTextWidth, GoldTextHeight);
+	Canvas->StrLen(Font, PotionText, PotionTextWidth, PotionTextHeight);
 
-	const FVector2D PanelSize(FMath::Max(OreTextWidth, GoldTextWidth) + 40.0f, OreTextHeight + GoldTextHeight + 32.0f);
+	const float PanelWidth = FMath::Max3(OreTextWidth, GoldTextWidth, PotionTextWidth) + 40.0f;
+	const FVector2D PanelSize(PanelWidth, OreTextHeight + GoldTextHeight + PotionTextHeight + 36.0f);
 	const FVector2D PanelPosition(ViewportWidth - PanelSize.X - 40.0f, 26.0f);
 	DrawPanel(Canvas, PanelPosition, PanelSize);
 	DrawTextLine(Canvas, Font, OreText, PanelPosition + FVector2D(18.0f, 8.0f), FLinearColor::White);
 	DrawTextLine(Canvas, Font, GoldText, PanelPosition + FVector2D(18.0f, 8.0f + OreTextHeight + 4.0f), AccentColor);
+	DrawTextLine(Canvas, Font, PotionText, PanelPosition + FVector2D(18.0f, 8.0f + OreTextHeight + GoldTextHeight + 8.0f), PositiveColor);
 }
 
 void APlayerGameHUD::DrawLevelPanel() const
@@ -1172,9 +1448,14 @@ void APlayerGameHUD::DrawTradePanel(float ViewportWidth, float ViewportHeight)
 	const int32 GoldPerOre = ThiefController ? ThiefController->GetGoldPerOre() : 10;
 	const int32 PotionCost = ThiefController ? ThiefController->GetStaminaPotionCost() : 25;
 	const int32 PotionRestoreAmount = ThiefController ? FMath::RoundToInt(ThiefController->GetStaminaPotionRestoreAmount()) : 40;
+	const FString PotionKeyLabel = ThiefController
+		? GetCompactKeyLabel(ThiefController->GetInputActionKeyText(ERemappableInputAction::UsePotion))
+		: TEXT("Q");
 
-	const FVector2D PanelSize(760.0f, 500.0f);
-	const FVector2D PanelPosition((ViewportWidth - PanelSize.X) * 0.5f, (ViewportHeight - PanelSize.Y) * 0.5f);
+	const float HorizontalMargin = FMath::Clamp(ViewportWidth * 0.04f, 28.0f, 72.0f);
+	const float VerticalMargin = FMath::Clamp(ViewportHeight * 0.05f, 28.0f, 60.0f);
+	const FVector2D PanelPosition(HorizontalMargin, VerticalMargin);
+	const FVector2D PanelSize(ViewportWidth - HorizontalMargin * 2.0f, ViewportHeight - VerticalMargin * 2.0f);
 	DrawPanel(Canvas, PanelPosition, PanelSize, FLinearColor(0.03f, 0.04f, 0.05f, 0.97f));
 
 	FCanvasTileItem AccentStrip(PanelPosition, FVector2D(PanelSize.X, 8.0f), AccentColor);
@@ -1195,16 +1476,21 @@ void APlayerGameHUD::DrawTradePanel(float ViewportWidth, float ViewportHeight)
 			true);
 	}
 
-	const FVector2D ValueCardSize(180.0f, 74.0f);
+	const float CardGap = 22.0f;
+	const FVector2D ValueCardSize((PanelSize.X - 64.0f - CardGap * 2.0f) / 3.0f, 82.0f);
 	const FVector2D OreCardPosition = PanelPosition + FVector2D(32.0f, 106.0f);
-	const FVector2D GoldCardPosition = PanelPosition + FVector2D(236.0f, 106.0f);
+	const FVector2D GoldCardPosition = OreCardPosition + FVector2D(ValueCardSize.X + CardGap, 0.0f);
+	const FVector2D PotionCardPosition = GoldCardPosition + FVector2D(ValueCardSize.X + CardGap, 0.0f);
 	DrawPanel(Canvas, OreCardPosition, ValueCardSize, SecondaryPanelColor);
 	DrawPanel(Canvas, GoldCardPosition, ValueCardSize, SecondaryPanelColor);
+	DrawPanel(Canvas, PotionCardPosition, ValueCardSize, SecondaryPanelColor);
 
 	DrawTextLine(Canvas, MediumFont, bRussian ? TEXT("Руда") : TEXT("Ore"), OreCardPosition + FVector2D(18.0f, 12.0f), MutedTextColor);
 	DrawTextLine(Canvas, LargeFont, FString::FromInt(PlayerCharacter->CollectedOreResources), OreCardPosition + FVector2D(18.0f, 36.0f), FLinearColor::White);
 	DrawTextLine(Canvas, MediumFont, bRussian ? TEXT("Золото") : TEXT("Gold"), GoldCardPosition + FVector2D(18.0f, 12.0f), MutedTextColor);
 	DrawTextLine(Canvas, LargeFont, FString::FromInt(PlayerCharacter->GetCollectedGold()), GoldCardPosition + FVector2D(18.0f, 36.0f), AccentColor);
+	DrawTextLine(Canvas, MediumFont, bRussian ? TEXT("Зелья") : TEXT("Potions"), PotionCardPosition + FVector2D(18.0f, 12.0f), MutedTextColor);
+	DrawTextLine(Canvas, LargeFont, FString::FromInt(PlayerCharacter->GetStaminaPotionCount()), PotionCardPosition + FVector2D(18.0f, 36.0f), PositiveColor);
 
 	DrawTextLine(
 		Canvas,
@@ -1213,10 +1499,10 @@ void APlayerGameHUD::DrawTradePanel(float ViewportWidth, float ViewportHeight)
 		PanelPosition + FVector2D(32.0f, 200.0f),
 		FLinearColor::White);
 
-	const FVector2D TradeButtonSize(696.0f, 62.0f);
+	const FVector2D TradeButtonSize(PanelSize.X - 64.0f, 72.0f);
 	const FVector2D TradeButtonOne = PanelPosition + FVector2D(32.0f, 228.0f);
-	const FVector2D TradeButtonTwo = PanelPosition + FVector2D(32.0f, 302.0f);
-	const FVector2D TradeButtonThree = PanelPosition + FVector2D(32.0f, 376.0f);
+	const FVector2D TradeButtonTwo = PanelPosition + FVector2D(32.0f, 314.0f);
+	const FVector2D TradeButtonThree = PanelPosition + FVector2D(32.0f, 400.0f);
 
 	DrawActionButton(
 		bRussian ? TEXT("[1] Продать 1 руду") : TEXT("[1] Sell 1 Ore"),
@@ -1233,8 +1519,8 @@ void APlayerGameHUD::DrawTradePanel(float ViewportWidth, float ViewportHeight)
 	DrawActionButton(
 		bRussian ? TEXT("[3] Купить зелье стамины") : TEXT("[3] Buy Stamina Potion"),
 		bRussian
-			? FString::Printf(TEXT("-%d золота   +%d стамины"), PotionCost, PotionRestoreAmount)
-			: FString::Printf(TEXT("-%d Gold   +%d Stamina"), PotionCost, PotionRestoreAmount),
+			? FString::Printf(TEXT("-%d золота   +1 зелье (%d стамины)"), PotionCost, PotionRestoreAmount)
+			: FString::Printf(TEXT("-%d Gold   +1 Potion (%d Stamina)"), PotionCost, PotionRestoreAmount),
 		TradeButtonThree,
 		TradeButtonSize,
 		EHUDMenuAction::TradeBuyPotion,
@@ -1243,8 +1529,10 @@ void APlayerGameHUD::DrawTradePanel(float ViewportWidth, float ViewportHeight)
 	DrawTextLine(
 		Canvas,
 		MediumFont,
-		bRussian ? TEXT("Мышь или клавиши [1] [2] [3]   |   [Esc] Закрыть") : TEXT("Mouse or keys [1] [2] [3]   |   [Esc] Close"),
-		PanelPosition + FVector2D(32.0f, PanelSize.Y - 34.0f),
+		bRussian
+			? FString::Printf(TEXT("Мышь или клавиши [1] [2] [3]   |   [%s] Выпить зелье   |   [Esc] Закрыть"), *PotionKeyLabel)
+			: FString::Printf(TEXT("Mouse or keys [1] [2] [3]   |   [%s] Drink Potion   |   [Esc] Close"), *PotionKeyLabel),
+		PanelPosition + FVector2D(32.0f, PanelSize.Y - 44.0f),
 		MutedTextColor);
 }
 
@@ -1263,9 +1551,14 @@ void APlayerGameHUD::DrawProgressionPanel(float ViewportWidth, float ViewportHei
 		return;
 	}
 
-	const FVector2D PanelSize(720.0f, 360.0f);
-	const FVector2D PanelPosition((ViewportWidth - PanelSize.X) * 0.5f, (ViewportHeight - PanelSize.Y) * 0.5f);
-	DrawPanel(Canvas, PanelPosition, PanelSize);
+	const float HorizontalMargin = FMath::Clamp(ViewportWidth * 0.05f, 32.0f, 84.0f);
+	const float VerticalMargin = FMath::Clamp(ViewportHeight * 0.06f, 28.0f, 72.0f);
+	const FVector2D PanelPosition(HorizontalMargin, VerticalMargin);
+	const FVector2D PanelSize(ViewportWidth - HorizontalMargin * 2.0f, ViewportHeight - VerticalMargin * 2.0f);
+	DrawPanel(Canvas, PanelPosition, PanelSize, FLinearColor(0.03f, 0.04f, 0.05f, 0.97f));
+	FCanvasTileItem AccentStrip(PanelPosition, FVector2D(PanelSize.X, 8.0f), AccentColor);
+	AccentStrip.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(AccentStrip);
 
 	const AThiefPlayerController* ThiefController = GetThiefPlayerController();
 	const bool bRussian = ThiefController && ThiefController->IsRussianLanguage();
@@ -1285,7 +1578,7 @@ void APlayerGameHUD::DrawProgressionPanel(float ViewportWidth, float ViewportHei
 		bRussian
 			? FString::Printf(TEXT("Опыт: %d / %d"), PlayerCharacter->GetCurrentExperienceAmount(), PlayerCharacter->GetExperienceToNextLevelAmount())
 			: FString::Printf(TEXT("XP: %d / %d"), PlayerCharacter->GetCurrentExperienceAmount(), PlayerCharacter->GetExperienceToNextLevelAmount()),
-		PanelPosition + FVector2D(220.0f, 84.0f),
+		PanelPosition + FVector2D(260.0f, 84.0f),
 		FLinearColor::White);
 	DrawTextLine(
 		Canvas,
@@ -1293,7 +1586,7 @@ void APlayerGameHUD::DrawProgressionPanel(float ViewportWidth, float ViewportHei
 		bRussian
 			? FString::Printf(TEXT("Очки улучшений: %d"), PlayerCharacter->GetAvailableUpgradePoints())
 			: FString::Printf(TEXT("Upgrade Points: %d"), PlayerCharacter->GetAvailableUpgradePoints()),
-		PanelPosition + FVector2D(440.0f, 84.0f),
+		PanelPosition + FVector2D(520.0f, 84.0f),
 		PositiveColor);
 	DrawTextLine(
 		Canvas,
@@ -1319,10 +1612,12 @@ void APlayerGameHUD::DrawProgressionPanel(float ViewportWidth, float ViewportHei
 			: FString::Printf(TEXT("Walk Speed: %.0f"), PlayerCharacter->WalkSpeed),
 		PanelPosition + FVector2D(32.0f, 218.0f),
 		FLinearColor::White);
-	const FVector2D UpgradeButtonSize(308.0f, 58.0f);
-	const FVector2D UpgradeButtonOne = PanelPosition + FVector2D(380.0f, 124.0f);
-	const FVector2D UpgradeButtonTwo = PanelPosition + FVector2D(380.0f, 192.0f);
-	const FVector2D UpgradeButtonThree = PanelPosition + FVector2D(380.0f, 260.0f);
+	const float UpgradeColumnWidth = FMath::Min(420.0f, PanelSize.X * 0.42f);
+	const FVector2D UpgradeButtonSize(UpgradeColumnWidth, 68.0f);
+	const float UpgradeColumnX = PanelPosition.X + PanelSize.X - UpgradeColumnWidth - 36.0f;
+	const FVector2D UpgradeButtonOne = FVector2D(UpgradeColumnX, PanelPosition.Y + 124.0f);
+	const FVector2D UpgradeButtonTwo = FVector2D(UpgradeColumnX, PanelPosition.Y + 206.0f);
+	const FVector2D UpgradeButtonThree = FVector2D(UpgradeColumnX, PanelPosition.Y + 288.0f);
 
 	DrawActionButton(
 		bRussian ? TEXT("[1] Макс. стамина") : TEXT("[1] Max Stamina"),
@@ -1343,7 +1638,7 @@ void APlayerGameHUD::DrawProgressionPanel(float ViewportWidth, float ViewportHei
 		UpgradeButtonThree,
 		UpgradeButtonSize,
 		EHUDMenuAction::UpgradeMoveSpeed);
-	DrawTextLine(Canvas, MediumFont, bRussian ? TEXT("[Esc] Закрыть") : TEXT("[Esc] Close"), PanelPosition + FVector2D(32.0f, 296.0f), FLinearColor::White);
+	DrawTextLine(Canvas, MediumFont, bRussian ? TEXT("[Esc] Закрыть") : TEXT("[Esc] Close"), PanelPosition + FVector2D(32.0f, PanelSize.Y - 48.0f), FLinearColor::White);
 }
 
 void APlayerGameHUD::DrawMenuButton(const FString& Label, const FVector2D& Position, const FVector2D& Size, EHUDMenuAction Action, bool bPrimary, int32 Payload)

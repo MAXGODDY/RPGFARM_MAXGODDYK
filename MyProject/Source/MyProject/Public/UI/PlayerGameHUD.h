@@ -66,6 +66,7 @@ class MYPROJECT_API APlayerGameHUD : public AHUD
 public:
 	virtual void DrawHUD() override;
 	bool HandleClick(const FVector2D& ScreenPosition);
+	bool HandleScroll(float WheelDelta);
 
 private:
 	void DrawMainMenu(float ViewportWidth, float ViewportHeight);
@@ -73,7 +74,7 @@ private:
 	void DrawPauseMenu(float ViewportWidth, float ViewportHeight);
 	void DrawSettingsPanel(float ViewportWidth, float ViewportHeight, bool bShowBackToPause);
 	void DrawAudioSettingsSection(const class AThiefPlayerController* ThiefController, const FVector2D& PanelPosition, float PanelWidth, float Scale);
-	void DrawControlsSettingsSection(const class AThiefPlayerController* ThiefController, const FVector2D& PanelPosition, float PanelWidth, float Scale);
+	void DrawControlsSettingsSection(const class AThiefPlayerController* ThiefController, const FVector2D& PanelPosition, float PanelWidth, float PanelHeight, float Scale);
 	void DrawInterfaceSettingsSection(const class AThiefPlayerController* ThiefController, const FVector2D& PanelPosition, float PanelWidth, float Scale);
 	void DrawSettingsTabButton(
 		const FString& Label,
@@ -111,6 +112,7 @@ private:
 		EHUDMenuAction Action,
 		bool bPrimary = false,
 		int32 Payload = 0);
+	void DrawSidebarButton(const FString& Label, const FVector2D& Position, const FVector2D& Size, int32 TabIndex, bool bSelected);
 	FVector2D GetMousePosition() const;
 	bool IsButtonHovered(const FHUDButtonData& ButtonData) const;
 	void RegisterButton(EHUDMenuAction Action, const FVector2D& Position, const FVector2D& Size, int32 Payload = 0);
@@ -118,4 +120,6 @@ private:
 	class AThiefPlayerController* GetThiefPlayerController() const;
 
 	TArray<FHUDButtonData> ActiveButtons;
+	float ControlsBindingsScrollOffset = 0.0f;
+	float ControlsBindingsMaxScroll = 0.0f;
 };

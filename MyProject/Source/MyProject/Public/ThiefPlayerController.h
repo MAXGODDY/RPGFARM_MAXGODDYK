@@ -34,6 +34,7 @@ enum class ERemappableInputAction : uint8
 	Sprint,
 	Attack,
 	Interact,
+	UsePotion,
 	ToggleTradeMenu,
 	ToggleProgressionMenu,
 	MenuConfirm,
@@ -197,6 +198,7 @@ private:
 	void EnsureInputMappingsExist();
 	void UpdateLobbyMusic();
 	void OpenGameplayMap();
+	void HandleAttackAction();
 	void HandleInteractAction();
 	void HandlePrimaryConfirm();
 	void HandleBackAction();

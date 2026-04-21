@@ -42,6 +42,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Trading")
 	bool BuyStaminaPotion(int32 GoldCost, float RestoreAmount);
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool UseStaminaPotion();
+
 	UFUNCTION(BlueprintCallable, Category = "Progression")
 	bool SpendUpgradePoint(EPlayerUpgradeType UpgradeType);
 
@@ -63,6 +66,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Progression")
 	float GetOreDamageAmount() const;
 
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	int32 GetStaminaPotionCount() const;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Attack")
 	bool bIsAttacking;
 
@@ -71,6 +77,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Resources")
 	int32 CollectedGold;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	int32 StaminaPotionCount;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Progression")
 	int32 PlayerLevel;
@@ -102,21 +111,47 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stamina")
 	float PlusStamina;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stamina", meta = (ClampMin = "0.0"))
+	float MovingStaminaRegen;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stamina", meta = (ClampMin = "0.0"))
+	float StaminaRegenDelay;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stamina", meta = (ClampMin = "0"))
 	float Stamina;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stamina", meta = (ClampMin = "1.0"))
 	float MaxStamina;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory", meta = (ClampMin = "1.0"))
+	float StaminaPotionRestoreAmount;
+
 	void DecreaseStamina();
 	void IncreaseStamina();
 
 protected:
+	virtual bool HasMovementInputIntent() const;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
 	TObjectPtr<UAnimMontage> AttackMontage;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack")
 	TObjectPtr<UAnimSequenceBase> AttackTimingAnimation;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+	TObjectPtr<class UStaticMesh> EquippedPickaxeMesh;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+	FName PickaxeAttachSocketName;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+	FVector PickaxeRelativeLocation;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+	FRotator PickaxeRelativeRotation;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
+	FVector PickaxeRelativeScale;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Attack", meta = (ClampMin = "0.0"))
 	float OreDamage;
@@ -155,16 +190,22 @@ private:
 	void AddOreResources(int32 ResourceAmount);
 	void TriggerAttackHit();
 	void FinishAttackState();
+	void HandleUseStaminaPotionInput();
 	void LoadCharacterDataFromJson();
 	void SaveCharacterDataToJson() const;
 	void UpdateResourceCounter() const;
 	void UpdateStaminaBar() const;
 	void TryDamageOre();
+	void SyncAttachedVisualInputState();
+	bool TriggerAttachedVisualAttack();
+	void AttachPickaxeToAttachedVisual();
 
 	bool bCanAttack;
+	float TimeSinceLastStaminaUse;
 	FTimerHandle AttackCooldownHandle;
 	FTimerHandle AttackHitTimerHandle;
 	FTimerHandle AttackStateTimerHandle;
+	FTimerHandle AttachedVisualInputSyncTimerHandle;
 
 	UPROPERTY(Transient)
 	TObjectPtr<class UResourceCounterWidget> ResourceCounterWidget;

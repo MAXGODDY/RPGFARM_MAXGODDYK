@@ -26,4 +26,11 @@ public:
 
 	void Sprint();
 	void StopSprint();
+
+protected:
+	virtual bool HasMovementInputIntent() const override;
+
+private:
+	float ForwardMovementInputValue = 0.0f;
+	float RightMovementInputValue = 0.0f;
 };

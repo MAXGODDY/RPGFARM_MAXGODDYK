@@ -80,6 +80,7 @@ namespace
 			{ ERemappableInputAction::Sprint, TEXT("Sprint"), EKeys::LeftShift, false, 1.0f, TEXT("Sprint"), TEXT("Спринт"), TEXT("Run faster while stamina lasts"), TEXT("Быстрое движение за счёт стамины") },
 			{ ERemappableInputAction::Attack, TEXT("Attack"), EKeys::LeftMouseButton, false, 1.0f, TEXT("Attack"), TEXT("Удар"), TEXT("Swing the pickaxe and damage ore"), TEXT("Удар киркой по руде") },
 			{ ERemappableInputAction::Interact, InteractActionName, EKeys::E, false, 1.0f, TEXT("Interact"), TEXT("Взаимодействие"), TEXT("Interact with the trader"), TEXT("Взаимодействие с торговцем") },
+			{ ERemappableInputAction::UsePotion, TEXT("UsePotion"), EKeys::Q, false, 1.0f, TEXT("Use Potion"), TEXT("Использовать зелье"), TEXT("Drink a stored stamina potion"), TEXT("Выпить сохранённое зелье стамины") },
 			{ ERemappableInputAction::ToggleTradeMenu, ToggleTradeActionName, EKeys::B, false, 1.0f, TEXT("Quick Trade"), TEXT("Быстрая торговля"), TEXT("Open the trade menu near the trader"), TEXT("Открытие торговли рядом с NPC") },
 			{ ERemappableInputAction::ToggleProgressionMenu, ToggleProgressionActionName, EKeys::P, false, 1.0f, TEXT("Progression"), TEXT("Прокачка"), TEXT("Open the character progression panel"), TEXT("Открытие окна прокачки") },
 			{ ERemappableInputAction::MenuConfirm, MenuConfirmActionName, EKeys::Enter, false, 1.0f, TEXT("Confirm / Start"), TEXT("Подтвердить / Старт"), TEXT("Start the game or confirm a menu action"), TEXT("Старт игры или подтверждение меню") },
@@ -305,8 +306,11 @@ void AThiefPlayerController::SetupInputComponent()
 	BackBinding.bExecuteWhenPaused = true;
 
 	FInputKeyBinding& LeftClickBinding = InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &AThiefPlayerController::HandleLeftClick);
-	LeftClickBinding.bConsumeInput = false;
+	LeftClickBinding.bConsumeInput = true;
 	LeftClickBinding.bExecuteWhenPaused = true;
+
+	FInputActionBinding& AttackBinding = InputComponent->BindAction(TEXT("Attack"), IE_Pressed, this, &AThiefPlayerController::HandleAttackAction);
+	AttackBinding.bConsumeInput = true;
 
 	FInputActionBinding& InteractBinding = InputComponent->BindAction(InteractActionName, IE_Pressed, this, &AThiefPlayerController::HandleInteractAction);
 	InteractBinding.bConsumeInput = true;
@@ -341,6 +345,38 @@ bool AThiefPlayerController::InputKey(const FInputKeyEventArgs& Params)
 		}
 
 		return TryCaptureInputRebind(Params.Key);
+	}
+
+	if (!bWaitingForInputRebind && Params.Event == IE_Pressed && Params.Key == EKeys::Escape)
+	{
+		HandleBackAction();
+		return true;
+	}
+
+	if (!bWaitingForInputRebind
+		&& Params.Event == IE_Pressed
+		&& (Params.Key == EKeys::MouseScrollUp || Params.Key == EKeys::MouseScrollDown))
+	{
+		if (APlayerGameHUD* PlayerHUD = Cast<APlayerGameHUD>(GetHUD()))
+		{
+			const float WheelDelta = Params.Key == EKeys::MouseScrollDown ? 1.0f : -1.0f;
+			if (PlayerHUD->HandleScroll(WheelDelta))
+			{
+				return true;
+			}
+		}
+	}
+
+	if (!bWaitingForInputRebind && Params.Event == IE_Pressed && Params.Key == EKeys::LeftMouseButton)
+	{
+		if (IsAnyModalOpen())
+		{
+			HandleLeftClick();
+			return true;
+		}
+
+		HandleAttackAction();
+		return true;
 	}
 
 	return Super::InputKey(Params);
@@ -831,18 +867,79 @@ void AThiefPlayerController::LoadSettingsFromJson()
 	if (SaveData.InputBindings.Num() > 0)
 	{
 		UInputSettings* InputSettings = UInputSettings::GetInputSettings();
-		bool bMappingsChanged = false;
+		TMap<uint8, FKey> SavedKeysByActionId;
 		for (const FMyProjectInputBindingSaveData& SavedBinding : SaveData.InputBindings)
 		{
-			const FRemappableBindingDefinition* Definition = FindBindingDefinition(static_cast<ERemappableInputAction>(SavedBinding.InputAction));
-			const FKey NewKey(*SavedBinding.KeyName);
-			if (!Definition || !NewKey.IsValid())
+			const FKey SavedKey(*SavedBinding.KeyName);
+			if (SavedKey.IsValid())
 			{
-				continue;
+				SavedKeysByActionId.Add(SavedBinding.InputAction, SavedKey);
 			}
+		}
 
-			SetBindingKeyOnInputSettings(InputSettings, *Definition, NewKey);
-			bMappingsChanged = true;
+		const uint8 UsePotionId = static_cast<uint8>(ERemappableInputAction::UsePotion);
+		const uint8 ToggleTradeMenuId = static_cast<uint8>(ERemappableInputAction::ToggleTradeMenu);
+		const uint8 ToggleProgressionMenuId = static_cast<uint8>(ERemappableInputAction::ToggleProgressionMenu);
+		const uint8 MenuConfirmId = static_cast<uint8>(ERemappableInputAction::MenuConfirm);
+		const uint8 MenuBackId = static_cast<uint8>(ERemappableInputAction::MenuBack);
+		const bool bNeedsLegacyBindingMigration =
+			SavedKeysByActionId.Contains(UsePotionId) &&
+			SavedKeysByActionId.Contains(ToggleTradeMenuId) &&
+			SavedKeysByActionId.Contains(ToggleProgressionMenuId) &&
+			SavedKeysByActionId.Contains(MenuConfirmId) &&
+			SavedKeysByActionId.Contains(MenuBackId) &&
+			SavedKeysByActionId[UsePotionId] == EKeys::B &&
+			SavedKeysByActionId[ToggleTradeMenuId] == EKeys::P &&
+			SavedKeysByActionId[MenuConfirmId] == EKeys::Escape;
+
+		bool bMappingsChanged = false;
+		if (bNeedsLegacyBindingMigration)
+		{
+			for (const FRemappableBindingDefinition& Definition : GetRemappableBindingDefinitions())
+			{
+				FKey NewKey = EKeys::Invalid;
+				const uint8 CurrentActionId = static_cast<uint8>(Definition.InputAction);
+				if (CurrentActionId <= static_cast<uint8>(ERemappableInputAction::Interact))
+				{
+					NewKey = SavedKeysByActionId.FindRef(CurrentActionId);
+				}
+				else if (CurrentActionId == UsePotionId)
+				{
+					NewKey = EKeys::Q;
+				}
+				else
+				{
+					NewKey = SavedKeysByActionId.FindRef(CurrentActionId - 1);
+				}
+
+				if (!NewKey.IsValid())
+				{
+					continue;
+				}
+
+				SetBindingKeyOnInputSettings(InputSettings, Definition, NewKey);
+				bMappingsChanged = true;
+			}
+		}
+		else
+		{
+			for (const FMyProjectInputBindingSaveData& SavedBinding : SaveData.InputBindings)
+			{
+				const FRemappableBindingDefinition* Definition = FindBindingDefinition(static_cast<ERemappableInputAction>(SavedBinding.InputAction));
+				if (!Definition)
+				{
+					continue;
+				}
+
+				const FKey NewKey = SavedKeysByActionId.FindRef(SavedBinding.InputAction);
+				if (!NewKey.IsValid())
+				{
+					continue;
+				}
+
+				SetBindingKeyOnInputSettings(InputSettings, *Definition, NewKey);
+				bMappingsChanged = true;
+			}
 		}
 
 		if (InputSettings && bMappingsChanged)
@@ -854,6 +951,11 @@ void AThiefPlayerController::LoadSettingsFromJson()
 			{
 				PlayerInput->ForceRebuildingKeyMaps(false);
 			}
+		}
+
+		if (bNeedsLegacyBindingMigration)
+		{
+			SaveSettingsToJson();
 		}
 	}
 }
@@ -1101,6 +1203,19 @@ void AThiefPlayerController::OpenGameplayMap()
 	UGameplayStatics::OpenLevel(this, GameplayMapName);
 }
 
+void AThiefPlayerController::HandleAttackAction()
+{
+	if (IsInMenuMap() || bLoadingGameplayMap || IsAnyModalOpen())
+	{
+		return;
+	}
+
+	if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+	{
+		PlayerCharacter->Attack();
+	}
+}
+
 void AThiefPlayerController::HandleInteractAction()
 {
 	if (IsInMenuMap() || !HasNearbyTrader() || bPauseMenuOpen || bSettingsMenuOpen)
@@ -1183,25 +1298,26 @@ void AThiefPlayerController::HandleBackAction()
 
 void AThiefPlayerController::HandleLeftClick()
 {
-	if (!IsAnyModalOpen())
+	if (IsAnyModalOpen())
 	{
+		APlayerGameHUD* PlayerHUD = Cast<APlayerGameHUD>(GetHUD());
+		if (!PlayerHUD)
+		{
+			return;
+		}
+
+		float MouseX = 0.0f;
+		float MouseY = 0.0f;
+		if (!GetMousePosition(MouseX, MouseY))
+		{
+			return;
+		}
+
+		PlayerHUD->HandleClick(FVector2D(MouseX, MouseY));
 		return;
 	}
 
-	APlayerGameHUD* PlayerHUD = Cast<APlayerGameHUD>(GetHUD());
-	if (!PlayerHUD)
-	{
-		return;
-	}
-
-	float MouseX = 0.0f;
-	float MouseY = 0.0f;
-	if (!GetMousePosition(MouseX, MouseY))
-	{
-		return;
-	}
-
-	PlayerHUD->HandleClick(FVector2D(MouseX, MouseY));
+	HandleAttackAction();
 }
 
 void AThiefPlayerController::ToggleTradeMenu()
