@@ -3,10 +3,12 @@
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
+#include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "Math/UnrealMathUtility.h"
 #include "ThiefPlayerController.h"
 #include "GameplayCharacterBase.h"
+#include "Systems/WorkOrderSubsystem.h"
 
 namespace
 {
@@ -228,6 +230,90 @@ namespace
 	{
 		return IsRussian(ThiefController) ? FString(RussianText) : FString(EnglishText);
 	}
+
+	FString FormatShiftTimerText(const float RemainingShiftTime, const bool bRussian)
+	{
+		const int32 TotalSeconds = FMath::Max(0, FMath::CeilToInt(RemainingShiftTime));
+		const int32 Minutes = TotalSeconds / 60;
+		const int32 Seconds = TotalSeconds % 60;
+		return bRussian
+			? FString::Printf(TEXT("Время смены: %02d:%02d"), Minutes, Seconds)
+			: FString::Printf(TEXT("Shift Time: %02d:%02d"), Minutes, Seconds);
+	}
+
+	FString GetShiftStateLabel(const AThiefPlayerController* ThiefController, const EWorkOrderShiftState ShiftState)
+	{
+		switch (ShiftState)
+		{
+		case EWorkOrderShiftState::ReadyToTurnIn:
+			return LocalizeText(ThiefController, TEXT("Ready to turn in"), TEXT("Готово к сдаче"));
+		case EWorkOrderShiftState::Completed:
+			return LocalizeText(ThiefController, TEXT("Shift completed"), TEXT("Смена закрыта"));
+		case EWorkOrderShiftState::Failed:
+			return LocalizeText(ThiefController, TEXT("Shift failed"), TEXT("Смена провалена"));
+		case EWorkOrderShiftState::Abandoned:
+			return LocalizeText(ThiefController, TEXT("Shift abandoned"), TEXT("Смена прервана"));
+		case EWorkOrderShiftState::Active:
+		default:
+			return LocalizeText(ThiefController, TEXT("Shift in progress"), TEXT("Смена в работе"));
+		}
+	}
+
+	FString GetShiftResultTitle(const AThiefPlayerController* ThiefController, const EWorkOrderShiftState ShiftState)
+	{
+		switch (ShiftState)
+		{
+		case EWorkOrderShiftState::Completed:
+			return LocalizeText(ThiefController, TEXT("SHIFT COMPLETED"), TEXT("СМЕНА ЗАВЕРШЕНА"));
+		case EWorkOrderShiftState::Abandoned:
+			return LocalizeText(ThiefController, TEXT("SHIFT ABANDONED"), TEXT("СМЕНА ПРЕРВАНА"));
+		case EWorkOrderShiftState::Failed:
+		default:
+			return LocalizeText(ThiefController, TEXT("SHIFT FAILED"), TEXT("СМЕНА ПРОВАЛЕНА"));
+		}
+	}
+
+	FString GetMiniQuestTitle(const AThiefPlayerController* ThiefController, int32 QuestIndex)
+	{
+		switch (QuestIndex)
+		{
+		case 0:
+			return LocalizeText(ThiefController, TEXT("Crack The First Veins"), TEXT("Первые жилы"));
+		case 1:
+			return LocalizeText(ThiefController, TEXT("Ore Runner"), TEXT("Рудный рейс"));
+		case 2:
+			return LocalizeText(ThiefController, TEXT("Merchant Route"), TEXT("Маршрут торговца"));
+		case 3:
+			return LocalizeText(ThiefController, TEXT("Supply Belt"), TEXT("Пояс припасов"));
+		case 4:
+			return LocalizeText(ThiefController, TEXT("Second Breath"), TEXT("Второе дыхание"));
+		case 5:
+			return LocalizeText(ThiefController, TEXT("First Promotion"), TEXT("Первое повышение"));
+		default:
+			return LocalizeText(ThiefController, TEXT("Mini Quest"), TEXT("Мини-задание"));
+		}
+	}
+
+	FString GetMiniQuestDescription(const AThiefPlayerController* ThiefController, int32 QuestIndex)
+	{
+		switch (QuestIndex)
+		{
+		case 0:
+			return LocalizeText(ThiefController, TEXT("Break 3 ore nodes."), TEXT("Разбей 3 залежи руды."));
+		case 1:
+			return LocalizeText(ThiefController, TEXT("Collect 20 ore in total."), TEXT("Собери всего 20 руды."));
+		case 2:
+			return LocalizeText(ThiefController, TEXT("Sell 15 ore to the trader."), TEXT("Продай торговцу 15 руды."));
+		case 3:
+			return LocalizeText(ThiefController, TEXT("Buy 2 stamina potions."), TEXT("Купи 2 зелья стамины."));
+		case 4:
+			return LocalizeText(ThiefController, TEXT("Use 2 stamina potions."), TEXT("Используй 2 зелья стамины."));
+		case 5:
+			return LocalizeText(ThiefController, TEXT("Reach player level 3."), TEXT("Достигни 3 уровня."));
+		default:
+			return LocalizeText(ThiefController, TEXT("Keep pushing the run."), TEXT("Продолжай забег."));
+		}
+	}
 }
 
 void APlayerGameHUD::DrawHUD()
@@ -247,6 +333,8 @@ void APlayerGameHUD::DrawHUD()
 	{
 		return;
 	}
+
+	UpdateLevelUpPopupState();
 
 	AThiefPlayerController* ThiefController = GetThiefPlayerController();
 	if (ThiefController && ThiefController->IsInMenuMap())
@@ -269,18 +357,27 @@ void APlayerGameHUD::DrawHUD()
 			|| ThiefController->IsProgressionMenuOpen()
 			|| ThiefController->IsPauseMenuOpen()
 			|| ThiefController->IsSettingsMenuOpen()
+			|| ThiefController->IsShiftResultScreenOpen()
 			|| ThiefController->IsLoadingGameplayMap());
 
 	if (!bHasOpenModal)
 	{
 		DrawResourcePanel(ViewportWidth);
 		DrawLevelPanel();
+		DrawWorkOrderPanel(ViewportWidth, ViewportHeight);
 		DrawStaminaPanel(ViewportHeight);
 		DrawInteractionPrompt(ViewportWidth, ViewportHeight);
+		DrawLevelUpPopup(ViewportWidth, ViewportHeight);
 	}
 
 	if (ThiefController)
 	{
+		if (ThiefController->IsShiftResultScreenOpen())
+		{
+			DrawShiftResultScreen(ViewportWidth, ViewportHeight);
+			return;
+		}
+
 		if (ThiefController->IsTradeMenuOpen())
 		{
 			DrawTradePanel(ViewportWidth, ViewportHeight);
@@ -301,6 +398,40 @@ void APlayerGameHUD::DrawHUD()
 			DrawSettingsPanel(ViewportWidth, ViewportHeight, ThiefController->IsPauseMenuOpen());
 		}
 	}
+}
+
+void APlayerGameHUD::UpdateLevelUpPopupState()
+{
+	AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter();
+	if (!PlayerCharacter)
+	{
+		LastObservedPlayerLevel = INDEX_NONE;
+		return;
+	}
+
+	const int32 CurrentLevel = PlayerCharacter->GetPlayerLevel();
+	if (LastObservedPlayerLevel == INDEX_NONE)
+	{
+		LastObservedPlayerLevel = CurrentLevel;
+		return;
+	}
+
+	if (CurrentLevel > LastObservedPlayerLevel)
+	{
+		LevelPopupDisplayedLevel = CurrentLevel;
+		LevelPopupDisplayedPoints = PlayerCharacter->GetAvailableUpgradePoints();
+
+		if (const UWorld* World = GetWorld())
+		{
+			LevelPopupStartTime = World->GetTimeSeconds();
+		}
+		else
+		{
+			LevelPopupStartTime = 0.0f;
+		}
+	}
+
+	LastObservedPlayerLevel = CurrentLevel;
 }
 
 bool APlayerGameHUD::HandleClick(const FVector2D& ScreenPosition)
@@ -326,6 +457,22 @@ bool APlayerGameHUD::HandleClick(const FVector2D& ScreenPosition)
 		case EHUDMenuAction::StartGame:
 			ThiefController->StartGameplayFromMenu();
 			return true;
+		case EHUDMenuAction::WorkOrderPrev:
+			if (UWorkOrderSubsystem* WorkOrderSubsystem = ThiefController->GetGameInstance()
+				? ThiefController->GetGameInstance()->GetSubsystem<UWorkOrderSubsystem>()
+				: nullptr)
+			{
+				return WorkOrderSubsystem->CycleSelectedWorkOrder(-1);
+			}
+			return false;
+		case EHUDMenuAction::WorkOrderNext:
+			if (UWorkOrderSubsystem* WorkOrderSubsystem = ThiefController->GetGameInstance()
+				? ThiefController->GetGameInstance()->GetSubsystem<UWorkOrderSubsystem>()
+				: nullptr)
+			{
+				return WorkOrderSubsystem->CycleSelectedWorkOrder(1);
+			}
+			return false;
 		case EHUDMenuAction::OpenSettings:
 			ThiefController->OpenSettingsMenu();
 			return true;
@@ -407,6 +554,26 @@ bool APlayerGameHUD::HandleClick(const FVector2D& ScreenPosition)
 		case EHUDMenuAction::UpgradeMoveSpeed:
 			ThiefController->ExecuteMenuOption(3);
 			return true;
+		case EHUDMenuAction::ResetCharacterProgress:
+			ThiefController->ResetAllProgress();
+			if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+			{
+				LastObservedPlayerLevel = PlayerCharacter->GetPlayerLevel();
+			}
+			else
+			{
+				LastObservedPlayerLevel = INDEX_NONE;
+			}
+			LevelPopupDisplayedLevel = 0;
+			LevelPopupDisplayedPoints = 0;
+			LevelPopupStartTime = -1000.0f;
+			return true;
+		case EHUDMenuAction::CloseShiftResult:
+			ThiefController->DismissShiftResultScreen();
+			return true;
+		case EHUDMenuAction::AbandonShift:
+			ThiefController->AbandonActiveShift();
+			return true;
 		default:
 			return false;
 		}
@@ -450,6 +617,10 @@ void APlayerGameHUD::DrawMainMenu(float ViewportWidth, float ViewportHeight)
 	{
 		return;
 	}
+
+	const UWorkOrderSubsystem* WorkOrderSubsystem = ThiefController->GetGameInstance()
+		? ThiefController->GetGameInstance()->GetSubsystem<UWorkOrderSubsystem>()
+		: nullptr;
 	const float MenuScale = ThiefController ? ThiefController->GetMenuScaleSetting() : 1.0f;
 	const float EffectiveScale = FMath::Clamp(
 		MenuScale * FMath::Min(ViewportWidth / 1920.0f, ViewportHeight / 1080.0f),
@@ -587,43 +758,112 @@ void APlayerGameHUD::DrawMainMenu(float ViewportWidth, float ViewportHeight)
 	DrawMenuButton(LocalizeText(ThiefController, TEXT("Settings"), TEXT("Настройки")), ActionPanelPosition + FVector2D(26.0f * EffectiveScale, 222.0f * EffectiveScale), ButtonSize, EHUDMenuAction::OpenSettings);
 	DrawMenuButton(LocalizeText(ThiefController, TEXT("Quit Game"), TEXT("Выйти из игры")), ActionPanelPosition + FVector2D(26.0f * EffectiveScale, 298.0f * EffectiveScale), ButtonSize, EHUDMenuAction::QuitGame);
 
-	DrawPanel(Canvas, ActionPanelPosition + FVector2D(26.0f * EffectiveScale, 388.0f * EffectiveScale), FVector2D(ButtonSize.X, 148.0f * EffectiveScale), SecondaryPanelColor);
-	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Quick Hints"), TEXT("Быстрые подсказки")), ActionPanelPosition + FVector2D(44.0f * EffectiveScale, 404.0f * EffectiveScale), AccentColor, false, TextScale);
+	const FVector2D OrderPanelPosition = ActionPanelPosition + FVector2D(26.0f * EffectiveScale, 388.0f * EffectiveScale);
+	const FVector2D OrderPanelSize(ButtonSize.X, 292.0f * EffectiveScale);
+	DrawPanel(Canvas, OrderPanelPosition, OrderPanelSize, SecondaryPanelColor);
+	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Work Order"), TEXT("Заказ на смену")), OrderPanelPosition + FVector2D(18.0f * EffectiveScale, 16.0f * EffectiveScale), AccentColor, false, TextScale);
+
+	const int32 SelectedOrderIndex = WorkOrderSubsystem ? WorkOrderSubsystem->GetSelectedWorkOrderIndex() : 0;
+	const int32 WorkOrderCount = WorkOrderSubsystem ? WorkOrderSubsystem->GetWorkOrderCount() : 0;
+	const int32 UnlockedWorkOrderCount = WorkOrderSubsystem ? WorkOrderSubsystem->GetUnlockedWorkOrderCount() : 0;
+	const int32 CompletedShiftCount = WorkOrderSubsystem ? WorkOrderSubsystem->GetCompletedShiftCount() : 0;
+	const int32 Reputation = WorkOrderSubsystem ? WorkOrderSubsystem->GetReputation() : 0;
+	const FWorkOrderDefinition* SelectedWorkOrder = WorkOrderSubsystem ? WorkOrderSubsystem->GetSelectedWorkOrder() : nullptr;
+
+	const FVector2D SwitchButtonSize(42.0f * EffectiveScale, 38.0f * EffectiveScale);
+	DrawMenuButton(TEXT("<"), OrderPanelPosition + FVector2D(18.0f * EffectiveScale, 52.0f * EffectiveScale), SwitchButtonSize, EHUDMenuAction::WorkOrderPrev);
+	DrawMenuButton(TEXT(">"), OrderPanelPosition + FVector2D(OrderPanelSize.X - 18.0f * EffectiveScale - SwitchButtonSize.X, 52.0f * EffectiveScale), SwitchButtonSize, EHUDMenuAction::WorkOrderNext, true);
+
+	DrawTextLine(
+		Canvas,
+		SmallFont,
+		SelectedWorkOrder
+			? WorkOrderSubsystem->GetOrderTitle(SelectedOrderIndex, ThiefController->IsRussianLanguage())
+			: LocalizeText(ThiefController, TEXT("No order"), TEXT("Заказ не выбран")),
+		OrderPanelPosition + FVector2D(OrderPanelSize.X * 0.5f, 60.0f * EffectiveScale),
+		FLinearColor::White,
+		true,
+		0.92f * TextScale);
 	DrawTextLine(
 		Canvas,
 		SmallFont,
 		FString::Printf(
-			TEXT("%s: %s"),
-			*LocalizeText(ThiefController, TEXT("Start"), TEXT("Старт")),
-			*ThiefController->GetInputActionKeyText(ERemappableInputAction::MenuConfirm).ToString()),
-		ActionPanelPosition + FVector2D(44.0f * EffectiveScale, 438.0f * EffectiveScale),
-		FLinearColor::White,
-		false,
-		TextScale);
-	DrawTextLine(
-		Canvas,
-		SmallFont,
-		FString::Printf(
-			TEXT("%s: %s"),
-			*LocalizeText(ThiefController, TEXT("Settings / Back"), TEXT("Настройки / Назад")),
-			*ThiefController->GetInputActionKeyText(ERemappableInputAction::MenuBack).ToString()),
-		ActionPanelPosition + FVector2D(44.0f * EffectiveScale, 468.0f * EffectiveScale),
-		FLinearColor::White,
-		false,
-		TextScale);
-	DrawTextLine(
-		Canvas,
-		SmallFont,
-		LocalizeText(ThiefController, TEXT("The controls tab supports full key remapping."), TEXT("Во вкладке управления можно менять любые клавиши.")),
-		ActionPanelPosition + FVector2D(44.0f * EffectiveScale, 500.0f * EffectiveScale),
+			TEXT("%s %d/%d   |   %s %d"),
+			*LocalizeText(ThiefController, TEXT("Unlocked"), TEXT("Открыто")),
+			UnlockedWorkOrderCount,
+			FMath::Max(1, WorkOrderCount),
+			*LocalizeText(ThiefController, TEXT("Reputation"), TEXT("Репутация")),
+			Reputation),
+		OrderPanelPosition + FVector2D(OrderPanelSize.X * 0.5f, 88.0f * EffectiveScale),
 		MutedTextColor,
-		false,
-		TextScale);
+		true,
+		0.82f * TextScale);
+
+	if (SelectedWorkOrder)
+	{
+		DrawWrappedTextBlock(
+			Canvas,
+			SmallFont,
+			WorkOrderSubsystem->GetOrderObjectiveText(SelectedOrderIndex, ThiefController->IsRussianLanguage()),
+			OrderPanelPosition + FVector2D(18.0f * EffectiveScale, 116.0f * EffectiveScale),
+			OrderPanelSize.X - 36.0f * EffectiveScale,
+			FLinearColor::White,
+			0.86f * TextScale,
+			1.0f);
+
+		DrawTextLine(
+			Canvas,
+			SmallFont,
+			FString::Printf(
+				TEXT("%s %d   |   XP %d   |   %s +%d"),
+				*LocalizeText(ThiefController, TEXT("Gold"), TEXT("Золото")),
+				WorkOrderSubsystem->GetPreviewGoldReward(SelectedOrderIndex, false),
+				WorkOrderSubsystem->GetPreviewExperienceReward(SelectedOrderIndex, false),
+				*LocalizeText(ThiefController, TEXT("Rep"), TEXT("Реп.")),
+				WorkOrderSubsystem->GetPreviewReputationReward(SelectedOrderIndex, false)),
+			OrderPanelPosition + FVector2D(18.0f * EffectiveScale, 168.0f * EffectiveScale),
+			AccentColor,
+			false,
+			0.84f * TextScale);
+		DrawTextLine(
+			Canvas,
+			SmallFont,
+			FString::Printf(
+				TEXT("%s %d   |   %s %d"),
+				*LocalizeText(ThiefController, TEXT("Minutes"), TEXT("Минуты")),
+				FMath::RoundToInt(SelectedWorkOrder->ShiftDurationSeconds / 60.0f),
+				*LocalizeText(ThiefController, TEXT("Done"), TEXT("Смен закрыто")),
+				CompletedShiftCount),
+			OrderPanelPosition + FVector2D(18.0f * EffectiveScale, 194.0f * EffectiveScale),
+			PositiveColor,
+			false,
+			0.82f * TextScale);
+		DrawWrappedTextBlock(
+			Canvas,
+			SmallFont,
+			WorkOrderSubsystem->GetOrderBonusObjectiveText(SelectedOrderIndex, ThiefController->IsRussianLanguage()),
+			OrderPanelPosition + FVector2D(18.0f * EffectiveScale, 222.0f * EffectiveScale),
+			OrderPanelSize.X - 36.0f * EffectiveScale,
+			PositiveColor,
+			0.76f * TextScale,
+			1.0f);
+		DrawTextLine(
+			Canvas,
+			SmallFont,
+			FString::Printf(
+				TEXT("%s: %s"),
+				*WorkOrderSubsystem->GetOrderModifierText(SelectedOrderIndex, ThiefController->IsRussianLanguage()),
+				*WorkOrderSubsystem->GetOrderModifierEffectText(SelectedOrderIndex, ThiefController->IsRussianLanguage())),
+			OrderPanelPosition + FVector2D(18.0f * EffectiveScale, 262.0f * EffectiveScale),
+			MutedTextColor,
+			false,
+			0.70f * TextScale);
+	}
 
 	DrawTextLine(
 		Canvas,
 		MediumFont,
-		LocalizeText(ThiefController, TEXT("Open settings before launch to prepare your run."), TEXT("Перед стартом открой настройки и подготовь свой пресет.")),
+		LocalizeText(ThiefController, TEXT("Choose a work order, tune the lobby, then launch the shift."), TEXT("Выбери заказ, подготовь лобби и запускай смену.")),
 		FVector2D(PanelPosition.X + PanelSize.X * 0.5f, PanelPosition.Y + PanelSize.Y - 34.0f * EffectiveScale),
 		MutedTextColor,
 		true,
@@ -684,18 +924,22 @@ void APlayerGameHUD::DrawPauseMenu(float ViewportWidth, float ViewportHeight)
 {
 	UFont* LargeFont = GEngine ? GEngine->GetLargeFont() : nullptr;
 	UFont* MediumFont = GEngine ? GEngine->GetMediumFont() : nullptr;
-	if (!LargeFont || !MediumFont)
+	UFont* SmallFont = GEngine ? GEngine->GetSmallFont() : nullptr;
+	if (!LargeFont || !MediumFont || !SmallFont)
 	{
 		return;
 	}
 
 	const AThiefPlayerController* ThiefController = GetThiefPlayerController();
+	AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter();
 	const float MenuScale = ThiefController ? ThiefController->GetMenuScaleSetting() : 1.0f;
 	const float EffectiveScale = FMath::Clamp(
 		MenuScale * FMath::Min(ViewportWidth / 1920.0f, ViewportHeight / 1080.0f),
-		0.85f,
-		1.10f);
-	const float TextScale = FMath::Clamp(EffectiveScale, 0.82f, 1.0f);
+		0.94f,
+		1.16f);
+	const float TextScale = FMath::Clamp(EffectiveScale * 1.08f, 1.02f, 1.22f);
+	const float BodyScale = TextScale;
+	const float DetailScale = FMath::Clamp(0.94f * TextScale, 0.92f, 1.08f);
 	FCanvasTileItem Overlay(FVector2D::ZeroVector, FVector2D(ViewportWidth, ViewportHeight), MenuOverlayColor);
 	Overlay.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Overlay);
@@ -713,7 +957,7 @@ void APlayerGameHUD::DrawPauseMenu(float ViewportWidth, float ViewportHeight)
 	DrawTextLine(
 		Canvas,
 		MediumFont,
-		LocalizeText(ThiefController, TEXT("Pause gameplay, adjust settings or return to the lobby."), TEXT("Пауза, настройки и выход обратно в лобби.")),
+		LocalizeText(ThiefController, TEXT("Pause, inspect goals, tweak settings, or reset the run."), TEXT("Пауза, просмотр целей, настройки и сброс текущего прогресса.")),
 		PanelPosition + FVector2D(PanelSize.X * 0.5f, 100.0f * EffectiveScale),
 		FLinearColor::White,
 		true,
@@ -722,31 +966,397 @@ void APlayerGameHUD::DrawPauseMenu(float ViewportWidth, float ViewportHeight)
 	const FVector2D InfoPanelPosition = PanelPosition + FVector2D(40.0f * EffectiveScale, 160.0f * EffectiveScale);
 	const FVector2D InfoPanelSize(PanelSize.X * 0.48f, PanelSize.Y - 240.0f * EffectiveScale);
 	DrawPanel(Canvas, InfoPanelPosition, InfoPanelSize, HeroPanelColor);
-	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Session Control"), TEXT("Управление заходом")), InfoPanelPosition + FVector2D(24.0f * EffectiveScale, 22.0f * EffectiveScale), AccentColor, false, TextScale);
+	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Mini Objectives"), TEXT("Мини-задания")), InfoPanelPosition + FVector2D(24.0f * EffectiveScale, 22.0f * EffectiveScale), AccentColor, false, TextScale);
 	DrawWrappedTextBlock(
 		Canvas,
 		MediumFont,
-		LocalizeText(ThiefController, TEXT("Resume the run, jump into settings, or go back to the lobby without losing the current UI context."), TEXT("Продолжай забег, переходи в настройки или возвращайся в лобби без потери текущего контекста интерфейса.")),
+		LocalizeText(ThiefController, TEXT("Open Esc any time to see what is left in the current run. Progress updates automatically while you mine, trade, level up and use consumables."), TEXT("Открывай Esc в любой момент, чтобы видеть цели текущего захода. Прогресс обновляется сам во время добычи, торговли, прокачки и использования зелий.")),
 		InfoPanelPosition + FVector2D(24.0f * EffectiveScale, 62.0f * EffectiveScale),
 		InfoPanelSize.X - 48.0f * EffectiveScale,
 		FLinearColor::White,
-		TextScale);
-	DrawWrappedTextBlock(
+		0.82f * BodyScale,
+		1.0f);
+
+	const int32 QuestCount = PlayerCharacter ? PlayerCharacter->GetMiniQuestCount() : 0;
+	const int32 CompletedQuestCount = PlayerCharacter ? PlayerCharacter->GetCompletedMiniQuestCount() : 0;
+	DrawTextLine(
 		Canvas,
 		MediumFont,
-		LocalizeText(ThiefController, TEXT("Esc closes menus, buttons work with the mouse, and the settings screen now uses the whole frame instead of a narrow modal."), TEXT("Esc закрывает меню, кнопки работают мышкой, а экран настроек теперь занимает почти весь кадр, а не узкое окно.")),
-		InfoPanelPosition + FVector2D(24.0f * EffectiveScale, 170.0f * EffectiveScale),
-		InfoPanelSize.X - 48.0f * EffectiveScale,
-		MutedTextColor,
-		TextScale);
+		LocalizeText(
+			ThiefController,
+			*FString::Printf(TEXT("Completed: %d / %d"), CompletedQuestCount, QuestCount),
+			*FString::Printf(TEXT("Выполнено: %d / %d"), CompletedQuestCount, QuestCount)),
+		InfoPanelPosition + FVector2D(24.0f * EffectiveScale, 138.0f * EffectiveScale),
+		CompletedQuestCount >= QuestCount && QuestCount > 0 ? PositiveColor : FLinearColor::White,
+		false,
+		1.0f * TextScale);
+
+	const FVector2D QuestCardPosition = InfoPanelPosition + FVector2D(24.0f * EffectiveScale, 178.0f * EffectiveScale);
+	const FVector2D QuestCardSize(InfoPanelSize.X - 48.0f * EffectiveScale, 60.0f * EffectiveScale);
+	const float QuestCardStep = 70.0f * EffectiveScale;
+	for (int32 QuestIndex = 0; QuestIndex < QuestCount; ++QuestIndex)
+	{
+		int32 CurrentProgress = 0;
+		int32 TargetProgress = 0;
+		bool bCompleted = false;
+		if (!PlayerCharacter || !PlayerCharacter->GetMiniQuestProgress(QuestIndex, CurrentProgress, TargetProgress, bCompleted))
+		{
+			continue;
+		}
+
+		const FVector2D CardPosition = QuestCardPosition + FVector2D(0.0f, QuestCardStep * QuestIndex);
+		const FLinearColor CardColor = bCompleted
+			? FLinearColor(0.16f, 0.27f, 0.18f, 0.96f)
+			: FLinearColor(0.11f, 0.13f, 0.17f, 0.92f);
+		DrawPanel(Canvas, CardPosition, QuestCardSize, CardColor);
+
+		const FString TitleText = GetMiniQuestTitle(ThiefController, QuestIndex);
+		const FString DescriptionText = GetMiniQuestDescription(ThiefController, QuestIndex);
+		const FString ProgressText = FString::Printf(TEXT("%d / %d"), CurrentProgress, TargetProgress);
+		const float ProgressRatio = TargetProgress > 0
+			? FMath::Clamp(static_cast<float>(CurrentProgress) / static_cast<float>(TargetProgress), 0.0f, 1.0f)
+			: 0.0f;
+
+		DrawTextLine(Canvas, MediumFont, TitleText, CardPosition + FVector2D(14.0f * EffectiveScale, 7.0f * EffectiveScale), bCompleted ? PositiveColor : AccentColor, false, 0.82f * BodyScale);
+		DrawTextLine(Canvas, MediumFont, ProgressText, CardPosition + FVector2D(QuestCardSize.X - 110.0f * EffectiveScale, 7.0f * EffectiveScale), FLinearColor::White, false, 0.76f * BodyScale);
+		DrawTextLine(Canvas, SmallFont, DescriptionText, CardPosition + FVector2D(14.0f * EffectiveScale, 31.0f * EffectiveScale), MutedTextColor, false, DetailScale);
+
+		const FVector2D BarPosition = CardPosition + FVector2D(14.0f * EffectiveScale, QuestCardSize.Y - 13.0f * EffectiveScale);
+		const FVector2D BarSize(QuestCardSize.X - 28.0f * EffectiveScale, 6.0f * EffectiveScale);
+		FCanvasTileItem BarBackground(BarPosition, BarSize, FLinearColor(0.08f, 0.08f, 0.09f, 1.0f));
+		BarBackground.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(BarBackground);
+
+		FCanvasTileItem BarFill(BarPosition, FVector2D(BarSize.X * ProgressRatio, BarSize.Y), bCompleted ? PositiveColor : AccentColor);
+		BarFill.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(BarFill);
+	}
+
+	const UWorkOrderSubsystem* WorkOrderSubsystem = ThiefController && ThiefController->GetGameInstance()
+		? ThiefController->GetGameInstance()->GetSubsystem<UWorkOrderSubsystem>()
+		: nullptr;
+	if (WorkOrderSubsystem && WorkOrderSubsystem->HasTrackedShift())
+	{
+		const FWorkOrderDefinition* Definition = WorkOrderSubsystem->GetTrackedOrderDefinition();
+		if (Definition)
+		{
+			const FVector2D ShiftCardPosition(PanelPosition.X + PanelSize.X - PanelSize.X * 0.34f - 48.0f * EffectiveScale, PanelPosition.Y + 170.0f * EffectiveScale);
+			const FVector2D ShiftCardSize(PanelSize.X * 0.34f, 230.0f * EffectiveScale);
+			DrawPanel(Canvas, ShiftCardPosition, ShiftCardSize, SecondaryPanelColor);
+			DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Current Shift"), TEXT("Текущая смена")), ShiftCardPosition + FVector2D(18.0f * EffectiveScale, 16.0f * EffectiveScale), AccentColor, false, TextScale);
+			DrawTextLine(Canvas, MediumFont, WorkOrderSubsystem->GetOrderTitle(WorkOrderSubsystem->GetTrackedOrderIndex(), ThiefController->IsRussianLanguage()), ShiftCardPosition + FVector2D(18.0f * EffectiveScale, 46.0f * EffectiveScale), FLinearColor::White, false, 0.82f * BodyScale);
+			DrawWrappedTextBlock(
+				Canvas,
+				MediumFont,
+				WorkOrderSubsystem->GetOrderObjectiveText(WorkOrderSubsystem->GetTrackedOrderIndex(), ThiefController->IsRussianLanguage()),
+				ShiftCardPosition + FVector2D(18.0f * EffectiveScale, 70.0f * EffectiveScale),
+				ShiftCardSize.X - 36.0f * EffectiveScale,
+				MutedTextColor,
+				0.76f * BodyScale,
+				1.0f);
+			DrawWrappedTextBlock(
+				Canvas,
+				MediumFont,
+				WorkOrderSubsystem->GetOrderBonusObjectiveText(WorkOrderSubsystem->GetTrackedOrderIndex(), ThiefController->IsRussianLanguage()),
+				ShiftCardPosition + FVector2D(18.0f * EffectiveScale, 124.0f * EffectiveScale),
+				ShiftCardSize.X - 36.0f * EffectiveScale,
+				PositiveColor,
+				0.68f * BodyScale,
+				1.0f);
+			DrawWrappedTextBlock(
+				Canvas,
+				MediumFont,
+				FString::Printf(
+					TEXT("%s: %s"),
+					*WorkOrderSubsystem->GetOrderModifierText(WorkOrderSubsystem->GetTrackedOrderIndex(), ThiefController->IsRussianLanguage()),
+					*WorkOrderSubsystem->GetOrderModifierEffectText(WorkOrderSubsystem->GetTrackedOrderIndex(), ThiefController->IsRussianLanguage())),
+				ShiftCardPosition + FVector2D(18.0f * EffectiveScale, 174.0f * EffectiveScale),
+				ShiftCardSize.X - 36.0f * EffectiveScale,
+				AccentColor,
+				0.62f * BodyScale,
+				1.0f);
+		}
+	}
 
 	const FVector2D ButtonSize(FMath::Min(420.0f * EffectiveScale, PanelSize.X * 0.32f), 62.0f * EffectiveScale);
 	const float ButtonStartX = PanelPosition.X + PanelSize.X - ButtonSize.X - 48.0f * EffectiveScale;
-	const float ButtonStartY = PanelPosition.Y + 188.0f * EffectiveScale;
+	const bool bCanAbandonShift = WorkOrderSubsystem && WorkOrderSubsystem->IsShiftRunning();
+	const float ButtonStartY = PanelPosition.Y + (WorkOrderSubsystem && WorkOrderSubsystem->HasTrackedShift() ? 426.0f : 188.0f) * EffectiveScale;
 	DrawMenuButton(LocalizeText(ThiefController, TEXT("Resume"), TEXT("Продолжить")), FVector2D(ButtonStartX, ButtonStartY), ButtonSize, EHUDMenuAction::ResumeGame, true);
 	DrawMenuButton(LocalizeText(ThiefController, TEXT("Settings"), TEXT("Настройки")), FVector2D(ButtonStartX, ButtonStartY + 84.0f * EffectiveScale), ButtonSize, EHUDMenuAction::OpenSettings);
-	DrawMenuButton(LocalizeText(ThiefController, TEXT("Exit To Lobby"), TEXT("Выйти в лобби")), FVector2D(ButtonStartX, ButtonStartY + 168.0f * EffectiveScale), ButtonSize, EHUDMenuAction::ReturnToLobby);
-	DrawMenuButton(LocalizeText(ThiefController, TEXT("Quit Game"), TEXT("Выйти из игры")), FVector2D(ButtonStartX, ButtonStartY + 252.0f * EffectiveScale), ButtonSize, EHUDMenuAction::QuitGame);
+	float NextButtonY = ButtonStartY + 168.0f * EffectiveScale;
+	if (bCanAbandonShift)
+	{
+		DrawMenuButton(LocalizeText(ThiefController, TEXT("Abandon Shift"), TEXT("Прервать смену")), FVector2D(ButtonStartX, NextButtonY), ButtonSize, EHUDMenuAction::AbandonShift);
+		NextButtonY += 84.0f * EffectiveScale;
+	}
+	DrawMenuButton(LocalizeText(ThiefController, TEXT("Reset Progress"), TEXT("Сбросить прогресс")), FVector2D(ButtonStartX, NextButtonY), ButtonSize, EHUDMenuAction::ResetCharacterProgress);
+	NextButtonY += 84.0f * EffectiveScale;
+	DrawMenuButton(LocalizeText(ThiefController, TEXT("Exit To Lobby"), TEXT("Выйти в лобби")), FVector2D(ButtonStartX, NextButtonY), ButtonSize, EHUDMenuAction::ReturnToLobby);
+	NextButtonY += 84.0f * EffectiveScale;
+	DrawMenuButton(LocalizeText(ThiefController, TEXT("Quit Game"), TEXT("Выйти из игры")), FVector2D(ButtonStartX, NextButtonY), ButtonSize, EHUDMenuAction::QuitGame);
+}
+
+void APlayerGameHUD::DrawWorkOrderPanel(float ViewportWidth, float ViewportHeight) const
+{
+	const AThiefPlayerController* ThiefController = GetThiefPlayerController();
+	const AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter();
+	if (!ThiefController || !PlayerCharacter)
+	{
+		return;
+	}
+
+	const UWorkOrderSubsystem* WorkOrderSubsystem = ThiefController->GetGameInstance()
+		? ThiefController->GetGameInstance()->GetSubsystem<UWorkOrderSubsystem>()
+		: nullptr;
+	if (!WorkOrderSubsystem || !WorkOrderSubsystem->HasTrackedShift())
+	{
+		return;
+	}
+
+	const FWorkOrderDefinition* Definition = WorkOrderSubsystem->GetTrackedOrderDefinition();
+	if (!Definition)
+	{
+		return;
+	}
+
+	UFont* MediumFont = GEngine ? GEngine->GetMediumFont() : nullptr;
+	UFont* SmallFont = GEngine ? GEngine->GetSmallFont() : nullptr;
+	if (!MediumFont || !SmallFont)
+	{
+		return;
+	}
+
+	const bool bRussian = ThiefController->IsRussianLanguage();
+	const EWorkOrderShiftState ShiftState = WorkOrderSubsystem->GetShiftState();
+	const int32 CurrentProgress = WorkOrderSubsystem->GetTrackedShiftProgress(PlayerCharacter);
+	const int32 TargetProgress = WorkOrderSubsystem->GetTrackedShiftTarget();
+	const float ProgressRatio = WorkOrderSubsystem->GetTrackedShiftProgressRatio(PlayerCharacter);
+	const int32 BonusProgress = WorkOrderSubsystem->GetTrackedBonusProgress(PlayerCharacter);
+	const int32 BonusTarget = WorkOrderSubsystem->GetTrackedBonusTarget();
+	const float BonusProgressRatio = WorkOrderSubsystem->GetTrackedBonusProgressRatio(PlayerCharacter);
+	const bool bBonusCompleted = WorkOrderSubsystem->IsTrackedBonusCompleted(PlayerCharacter);
+	const float HudScale = FMath::Clamp(FMath::Min(ViewportWidth / 1920.0f, ViewportHeight / 1080.0f), 0.96f, 1.12f);
+	const FVector2D PanelPosition(34.0f, 112.0f);
+	const FVector2D PanelSize(FMath::Clamp(ViewportWidth * 0.26f, 380.0f, 480.0f), FMath::Clamp(ViewportHeight * 0.25f, 214.0f, 270.0f));
+	const FLinearColor FillColor =
+		ShiftState == EWorkOrderShiftState::Completed ? FLinearColor(0.11f, 0.20f, 0.14f, 0.96f) :
+		ShiftState == EWorkOrderShiftState::Failed ? FLinearColor(0.22f, 0.11f, 0.10f, 0.96f) :
+		ShiftState == EWorkOrderShiftState::ReadyToTurnIn ? FLinearColor(0.15f, 0.18f, 0.09f, 0.96f) :
+		FLinearColor(0.05f, 0.08f, 0.11f, 0.94f);
+	DrawPanel(Canvas, PanelPosition, PanelSize, FillColor);
+
+	const FString TitleText = WorkOrderSubsystem->GetOrderTitle(WorkOrderSubsystem->GetTrackedOrderIndex(), bRussian);
+	const FString StateText = GetShiftStateLabel(ThiefController, ShiftState);
+	DrawTextLine(Canvas, MediumFont, TitleText, PanelPosition + FVector2D(16.0f, 12.0f), AccentColor, false, 0.92f * HudScale);
+	DrawTextLine(Canvas, MediumFont, StateText, PanelPosition + FVector2D(16.0f, 38.0f), ShiftState == EWorkOrderShiftState::Failed ? FLinearColor(1.0f, 0.72f, 0.68f, 1.0f) : FLinearColor::White, false, 0.68f * HudScale);
+
+	if (ShiftState == EWorkOrderShiftState::Active || ShiftState == EWorkOrderShiftState::ReadyToTurnIn)
+	{
+		DrawTextLine(Canvas, MediumFont, FormatShiftTimerText(WorkOrderSubsystem->GetRemainingShiftTime(), bRussian), PanelPosition + FVector2D(PanelSize.X - 188.0f, 14.0f), PositiveColor, false, 0.54f * HudScale);
+	}
+	else if (ShiftState == EWorkOrderShiftState::Completed)
+	{
+		DrawTextLine(
+			Canvas,
+			MediumFont,
+			FString::Printf(
+				TEXT("+%d %s   |   XP +%d"),
+				WorkOrderSubsystem->GetLastRewardedGold(),
+				bRussian ? TEXT("золота") : TEXT("Gold"),
+				WorkOrderSubsystem->GetLastRewardedExperience()),
+			PanelPosition + FVector2D(PanelSize.X - 242.0f, 14.0f),
+			PositiveColor,
+			false,
+			0.50f * HudScale);
+	}
+
+	DrawWrappedTextBlock(
+		Canvas,
+		MediumFont,
+		WorkOrderSubsystem->GetOrderObjectiveText(WorkOrderSubsystem->GetTrackedOrderIndex(), bRussian),
+		PanelPosition + FVector2D(16.0f, 62.0f),
+		PanelSize.X - 32.0f,
+		MutedTextColor,
+		0.56f * HudScale,
+		1.0f);
+
+	const TCHAR* ProgressLabel = bRussian ? TEXT("Прогресс:") : TEXT("Progress:");
+	const FString ProgressText = FString::Printf(
+		TEXT("%s %d / %d"),
+		ProgressLabel,
+		CurrentProgress,
+		TargetProgress);
+	DrawTextLine(Canvas, MediumFont, ProgressText, PanelPosition + FVector2D(16.0f, 104.0f), FLinearColor::White, false, 0.60f * HudScale);
+
+	const FVector2D BarPosition = PanelPosition + FVector2D(16.0f, 128.0f);
+	const FVector2D BarSize(PanelSize.X - 32.0f, 7.0f);
+	FCanvasTileItem BarBackground(BarPosition, BarSize, FLinearColor(0.09f, 0.08f, 0.07f, 1.0f));
+	BarBackground.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(BarBackground);
+
+	FCanvasTileItem BarFill(
+		BarPosition,
+		FVector2D(BarSize.X * ProgressRatio, BarSize.Y),
+		ShiftState == EWorkOrderShiftState::Failed ? DangerButtonHoveredColor : (ShiftState == EWorkOrderShiftState::Completed ? PositiveColor : AccentColor));
+	BarFill.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(BarFill);
+
+	if (BonusTarget > 0)
+	{
+		const FString BonusTitle = bRussian ? TEXT("Бонус:") : TEXT("Bonus:");
+		const FString BonusText = FString::Printf(TEXT("%s %d / %d"), *BonusTitle, BonusProgress, BonusTarget);
+		DrawWrappedTextBlock(
+			Canvas,
+			SmallFont,
+			WorkOrderSubsystem->GetOrderBonusObjectiveText(WorkOrderSubsystem->GetTrackedOrderIndex(), bRussian),
+			PanelPosition + FVector2D(16.0f, 146.0f),
+			PanelSize.X - 32.0f,
+			bBonusCompleted ? PositiveColor : MutedTextColor,
+			0.74f * HudScale,
+			1.0f);
+		DrawTextLine(Canvas, MediumFont, BonusText, PanelPosition + FVector2D(16.0f, 178.0f), bBonusCompleted ? PositiveColor : FLinearColor::White, false, 0.56f * HudScale);
+
+		const FVector2D BonusBarPosition = PanelPosition + FVector2D(16.0f, 199.0f);
+		FCanvasTileItem BonusBarBackground(BonusBarPosition, BarSize, FLinearColor(0.09f, 0.08f, 0.07f, 1.0f));
+		BonusBarBackground.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(BonusBarBackground);
+
+		FCanvasTileItem BonusBarFill(
+			BonusBarPosition,
+			FVector2D(BarSize.X * BonusProgressRatio, BarSize.Y),
+			bBonusCompleted ? PositiveColor : FLinearColor(0.55f, 0.70f, 0.86f, 1.0f));
+		BonusBarFill.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(BonusBarFill);
+	}
+
+	DrawWrappedTextBlock(
+		Canvas,
+		SmallFont,
+		WorkOrderSubsystem->GetOrderModifierEffectText(WorkOrderSubsystem->GetTrackedOrderIndex(), bRussian),
+		PanelPosition + FVector2D(16.0f, PanelSize.Y - 42.0f),
+		PanelSize.X - 32.0f,
+		MutedTextColor,
+		0.66f * HudScale,
+		1.0f);
+}
+
+void APlayerGameHUD::DrawShiftResultScreen(float ViewportWidth, float ViewportHeight)
+{
+	AThiefPlayerController* ThiefController = GetThiefPlayerController();
+	const AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter();
+	if (!ThiefController)
+	{
+		return;
+	}
+
+	const UWorkOrderSubsystem* WorkOrderSubsystem = ThiefController->GetGameInstance()
+		? ThiefController->GetGameInstance()->GetSubsystem<UWorkOrderSubsystem>()
+		: nullptr;
+	if (!WorkOrderSubsystem || !WorkOrderSubsystem->HasResolvedShiftResult())
+	{
+		return;
+	}
+
+	UFont* LargeFont = GEngine ? GEngine->GetLargeFont() : nullptr;
+	UFont* MediumFont = GEngine ? GEngine->GetMediumFont() : nullptr;
+	UFont* SmallFont = GEngine ? GEngine->GetSmallFont() : nullptr;
+	if (!LargeFont || !MediumFont || !SmallFont)
+	{
+		return;
+	}
+
+	const bool bRussian = ThiefController->IsRussianLanguage();
+	const int32 OrderIndex = WorkOrderSubsystem->GetTrackedOrderIndex();
+	const EWorkOrderShiftState ResultState = WorkOrderSubsystem->GetLastResolvedState();
+	const bool bCompleted = ResultState == EWorkOrderShiftState::Completed;
+	const bool bAbandoned = ResultState == EWorkOrderShiftState::Abandoned;
+	const bool bBonusCompleted = WorkOrderSubsystem->WasLastBonusCompleted();
+	const int32 PrimaryProgress = WorkOrderSubsystem->GetTrackedShiftProgress(PlayerCharacter);
+	const int32 PrimaryTarget = WorkOrderSubsystem->GetTrackedShiftTarget();
+	const int32 BonusProgress = WorkOrderSubsystem->GetTrackedBonusProgress(PlayerCharacter);
+	const int32 BonusTarget = WorkOrderSubsystem->GetTrackedBonusTarget();
+	const float EffectiveScale = FMath::Clamp(FMath::Min(ViewportWidth / 1920.0f, ViewportHeight / 1080.0f), 0.90f, 1.12f);
+
+	FCanvasTileItem Overlay(FVector2D::ZeroVector, FVector2D(ViewportWidth, ViewportHeight), FLinearColor(0.01f, 0.01f, 0.02f, 0.90f));
+	Overlay.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Overlay);
+
+	const FVector2D PanelSize(FMath::Clamp(ViewportWidth * 0.54f, 720.0f, 980.0f), FMath::Clamp(ViewportHeight * 0.62f, 520.0f, 680.0f));
+	const FVector2D PanelPosition((ViewportWidth - PanelSize.X) * 0.5f, (ViewportHeight - PanelSize.Y) * 0.5f);
+	const FLinearColor ResultColor = bCompleted
+		? FLinearColor(0.08f, 0.16f, 0.11f, 0.97f)
+		: (bAbandoned ? FLinearColor(0.17f, 0.13f, 0.10f, 0.97f) : FLinearColor(0.18f, 0.08f, 0.08f, 0.97f));
+	DrawPanel(Canvas, PanelPosition, PanelSize, ResultColor);
+
+	const FString TitleText = GetShiftResultTitle(ThiefController, ResultState);
+	const FString OrderTitle = WorkOrderSubsystem->GetOrderTitle(OrderIndex, bRussian);
+	const FLinearColor TitleColor = bCompleted ? PositiveColor : (bAbandoned ? AccentColor : DangerButtonHoveredColor);
+	DrawTextLine(Canvas, LargeFont, TitleText, PanelPosition + FVector2D(PanelSize.X * 0.5f, 36.0f * EffectiveScale), TitleColor, true, 1.10f * EffectiveScale);
+	DrawTextLine(Canvas, MediumFont, OrderTitle, PanelPosition + FVector2D(PanelSize.X * 0.5f, 86.0f * EffectiveScale), FLinearColor::White, true, 0.96f * EffectiveScale);
+
+	const FVector2D SummaryPosition = PanelPosition + FVector2D(40.0f * EffectiveScale, 130.0f * EffectiveScale);
+	const FVector2D SummarySize(PanelSize.X - 80.0f * EffectiveScale, 122.0f * EffectiveScale);
+	DrawPanel(Canvas, SummaryPosition, SummarySize, HeroPanelColor);
+	const FString SummaryText = bCompleted
+		? LocalizeText(ThiefController, TEXT("The work order was closed successfully. Rewards were added to the character."), TEXT("Заказ успешно закрыт. Награды добавлены персонажу."))
+		: (bAbandoned
+			? LocalizeText(ThiefController, TEXT("The shift was abandoned manually. No reward was issued."), TEXT("Смена прервана вручную. Награда не выдана."))
+			: LocalizeText(ThiefController, TEXT("The shift timer expired before turn-in. No reward was issued."), TEXT("Таймер смены закончился до сдачи. Награда не выдана.")));
+	DrawWrappedTextBlock(Canvas, MediumFont, SummaryText, SummaryPosition + FVector2D(24.0f * EffectiveScale, 22.0f * EffectiveScale), SummarySize.X - 48.0f * EffectiveScale, FLinearColor::White, 0.82f * EffectiveScale, 1.05f);
+	DrawWrappedTextBlock(Canvas, SmallFont, WorkOrderSubsystem->GetOrderModifierEffectText(OrderIndex, bRussian), SummaryPosition + FVector2D(24.0f * EffectiveScale, 78.0f * EffectiveScale), SummarySize.X - 48.0f * EffectiveScale, MutedTextColor, 0.80f * EffectiveScale, 1.0f);
+
+	const FVector2D ObjectiveRowPosition = PanelPosition + FVector2D(40.0f * EffectiveScale, 280.0f * EffectiveScale);
+	const FVector2D RowSize(PanelSize.X - 80.0f * EffectiveScale, 74.0f * EffectiveScale);
+	DrawPanel(Canvas, ObjectiveRowPosition, RowSize, SecondaryPanelColor);
+	DrawTextLine(Canvas, MediumFont, bRussian ? TEXT("Основная цель") : TEXT("Primary Objective"), ObjectiveRowPosition + FVector2D(20.0f * EffectiveScale, 10.0f * EffectiveScale), AccentColor, false, 0.78f * EffectiveScale);
+	DrawWrappedTextBlock(Canvas, SmallFont, WorkOrderSubsystem->GetOrderObjectiveText(OrderIndex, bRussian), ObjectiveRowPosition + FVector2D(20.0f * EffectiveScale, 38.0f * EffectiveScale), RowSize.X - 220.0f * EffectiveScale, FLinearColor::White, 0.78f * EffectiveScale, 1.0f);
+	DrawTextLine(
+		Canvas,
+		MediumFont,
+		FString::Printf(TEXT("%d / %d"), PrimaryProgress, PrimaryTarget),
+		ObjectiveRowPosition + FVector2D(RowSize.X - 150.0f * EffectiveScale, 28.0f * EffectiveScale),
+		bCompleted ? PositiveColor : FLinearColor::White,
+		false,
+		0.86f * EffectiveScale);
+
+	const FVector2D BonusRowPosition = ObjectiveRowPosition + FVector2D(0.0f, 88.0f * EffectiveScale);
+	DrawPanel(Canvas, BonusRowPosition, RowSize, SecondaryPanelColor);
+	DrawTextLine(Canvas, MediumFont, bRussian ? TEXT("Бонусная цель") : TEXT("Bonus Objective"), BonusRowPosition + FVector2D(20.0f * EffectiveScale, 10.0f * EffectiveScale), bBonusCompleted ? PositiveColor : AccentColor, false, 0.78f * EffectiveScale);
+	DrawWrappedTextBlock(Canvas, SmallFont, WorkOrderSubsystem->GetOrderBonusObjectiveText(OrderIndex, bRussian), BonusRowPosition + FVector2D(20.0f * EffectiveScale, 38.0f * EffectiveScale), RowSize.X - 220.0f * EffectiveScale, FLinearColor::White, 0.78f * EffectiveScale, 1.0f);
+	DrawTextLine(
+		Canvas,
+		MediumFont,
+		BonusTarget > 0 ? FString::Printf(TEXT("%d / %d"), BonusProgress, BonusTarget) : TEXT("-"),
+		BonusRowPosition + FVector2D(RowSize.X - 150.0f * EffectiveScale, 28.0f * EffectiveScale),
+		bBonusCompleted ? PositiveColor : MutedTextColor,
+		false,
+		0.86f * EffectiveScale);
+
+	const FVector2D RewardPosition = PanelPosition + FVector2D(40.0f * EffectiveScale, 470.0f * EffectiveScale);
+	const FVector2D RewardSize(PanelSize.X - 80.0f * EffectiveScale, 76.0f * EffectiveScale);
+	DrawPanel(Canvas, RewardPosition, RewardSize, bCompleted ? FLinearColor(0.10f, 0.18f, 0.11f, 0.96f) : FLinearColor(0.11f, 0.11f, 0.12f, 0.96f));
+	const FString RewardText = bCompleted
+		? (bRussian
+			? FString::Printf(
+				TEXT("Награда: +%d золота, +%d опыта, +%d репутации%s"),
+				WorkOrderSubsystem->GetLastRewardedGold(),
+				WorkOrderSubsystem->GetLastRewardedExperience(),
+				WorkOrderSubsystem->GetLastRewardedReputation(),
+				bBonusCompleted ? TEXT("  | бонус засчитан") : TEXT(""))
+			: FString::Printf(
+				TEXT("Reward: +%d Gold, +%d XP, +%d Reputation%s"),
+				WorkOrderSubsystem->GetLastRewardedGold(),
+				WorkOrderSubsystem->GetLastRewardedExperience(),
+				WorkOrderSubsystem->GetLastRewardedReputation(),
+				bBonusCompleted ? TEXT("  | bonus completed") : TEXT("")))
+		: LocalizeText(ThiefController, TEXT("Reward: not issued"), TEXT("Награда: не выдана"));
+	DrawWrappedTextBlock(Canvas, MediumFont, RewardText, RewardPosition + FVector2D(22.0f * EffectiveScale, 24.0f * EffectiveScale), RewardSize.X - 44.0f * EffectiveScale, bCompleted ? PositiveColor : MutedTextColor, 0.86f * EffectiveScale, 1.0f);
+
+	const FVector2D ButtonSize(220.0f * EffectiveScale, 58.0f * EffectiveScale);
+	const float ButtonY = PanelPosition.Y + PanelSize.Y - 86.0f * EffectiveScale;
+	DrawMenuButton(LocalizeText(ThiefController, TEXT("Continue"), TEXT("Продолжить")), FVector2D(PanelPosition.X + PanelSize.X - ButtonSize.X * 2.0f - 64.0f * EffectiveScale, ButtonY), ButtonSize, EHUDMenuAction::CloseShiftResult, true);
+	DrawMenuButton(LocalizeText(ThiefController, TEXT("Exit To Lobby"), TEXT("Выйти в лобби")), FVector2D(PanelPosition.X + PanelSize.X - ButtonSize.X - 40.0f * EffectiveScale, ButtonY), ButtonSize, EHUDMenuAction::ReturnToLobby);
 }
 
 void APlayerGameHUD::DrawSettingsPanel(float ViewportWidth, float ViewportHeight, bool bShowBackToPause)
@@ -1335,6 +1945,109 @@ void APlayerGameHUD::DrawLevelPanel() const
 	DrawTextLine(Canvas, Font, ExperienceText, PanelPosition + FVector2D(16.0f, 36.0f), FLinearColor::White);
 }
 
+void APlayerGameHUD::DrawLevelUpPopup(float ViewportWidth, float ViewportHeight) const
+{
+	if (LevelPopupDisplayedLevel <= 0 || LevelPopupDuration <= KINDA_SMALL_NUMBER || LevelPopupStartTime < 0.0f)
+	{
+		return;
+	}
+
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const float ElapsedTime = World->GetTimeSeconds() - LevelPopupStartTime;
+	if (ElapsedTime < 0.0f || ElapsedTime >= LevelPopupDuration)
+	{
+		return;
+	}
+
+	UFont* LargeFont = GEngine ? GEngine->GetLargeFont() : nullptr;
+	UFont* MediumFont = GEngine ? GEngine->GetMediumFont() : nullptr;
+	UFont* SmallFont = GEngine ? GEngine->GetSmallFont() : nullptr;
+	if (!LargeFont || !MediumFont || !SmallFont)
+	{
+		return;
+	}
+
+	const AThiefPlayerController* ThiefController = GetThiefPlayerController();
+	const float NormalizedTime = FMath::Clamp(ElapsedTime / LevelPopupDuration, 0.0f, 1.0f);
+	const float FadeInAlpha = FMath::Clamp(NormalizedTime / 0.16f, 0.0f, 1.0f);
+	const float FadeOutAlpha = 1.0f - FMath::Clamp((NormalizedTime - 0.74f) / 0.26f, 0.0f, 1.0f);
+	const float PopupAlpha = FadeInAlpha * FadeOutAlpha;
+	if (PopupAlpha <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	const float ViewScale = FMath::Clamp(FMath::Min(ViewportWidth / 1600.0f, ViewportHeight / 900.0f), 0.82f, 1.15f);
+	const float PulseScale = 1.0f + 0.025f * FMath::Sin(NormalizedTime * PI);
+	const float LayoutScale = ViewScale * PulseScale;
+	const float VerticalDrift = FMath::Lerp(22.0f * ViewScale, 0.0f, FMath::Clamp(NormalizedTime / 0.40f, 0.0f, 1.0f));
+	const FVector2D PanelSize(500.0f * LayoutScale, 200.0f * LayoutScale);
+	const FVector2D PanelPosition(
+		(ViewportWidth - PanelSize.X) * 0.5f,
+		FMath::Max(36.0f, ViewportHeight * 0.16f - VerticalDrift));
+
+	const auto ApplyAlpha = [PopupAlpha](const FLinearColor& Color, float AlphaScale = 1.0f)
+	{
+		return FLinearColor(Color.R, Color.G, Color.B, FMath::Clamp(Color.A * PopupAlpha * AlphaScale, 0.0f, 1.0f));
+	};
+
+	const FVector2D GlowPosition = PanelPosition - FVector2D(16.0f * ViewScale, 10.0f * ViewScale);
+	const FVector2D GlowSize = PanelSize + FVector2D(32.0f * ViewScale, 20.0f * ViewScale);
+	FCanvasTileItem GlowTile(GlowPosition, GlowSize, ApplyAlpha(FLinearColor(0.66f, 0.45f, 0.12f, 0.18f), 0.9f));
+	GlowTile.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(GlowTile);
+
+	DrawPanel(Canvas, PanelPosition, PanelSize, ApplyAlpha(FLinearColor(0.07f, 0.09f, 0.12f, 0.96f)));
+
+	const FVector2D RibbonPosition = PanelPosition + FVector2D(22.0f * ViewScale, 24.0f * ViewScale);
+	const FVector2D RibbonSize(PanelSize.X - 44.0f * ViewScale, 18.0f * ViewScale);
+	FCanvasTileItem RibbonTile(RibbonPosition, RibbonSize, ApplyAlpha(FLinearColor(0.23f, 0.17f, 0.08f, 0.74f)));
+	RibbonTile.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(RibbonTile);
+
+	const FString TitleText = LocalizeText(ThiefController, TEXT("LEVEL UP"), TEXT("УРОВЕНЬ ПОВЫШЕН"));
+	const FString SubtitleText = LocalizeText(
+		ThiefController,
+		*FString::Printf(TEXT("Reached level %d"), LevelPopupDisplayedLevel),
+		*FString::Printf(TEXT("Достигнут уровень %d"), LevelPopupDisplayedLevel));
+	const FString PointsText = LocalizeText(
+		ThiefController,
+		*FString::Printf(TEXT("Upgrade Points: %d"), LevelPopupDisplayedPoints),
+		*FString::Printf(TEXT("Очки улучшений: %d"), LevelPopupDisplayedPoints));
+	const FString BodyText = LocalizeText(
+		ThiefController,
+		TEXT("Spend points on stamina, ore damage and move speed."),
+		TEXT("Трать очки на стамину, урон по руде и скорость."));
+	const FString FooterText = LocalizeText(ThiefController, TEXT("[P] Open progression"), TEXT("[P] Открыть прокачку"));
+
+	const float CenterX = PanelPosition.X + PanelSize.X * 0.5f;
+	DrawTextLine(Canvas, LargeFont, TitleText, FVector2D(CenterX, PanelPosition.Y + 28.0f * LayoutScale), ApplyAlpha(AccentColor), true, 1.02f * ViewScale);
+	DrawTextLine(Canvas, MediumFont, SubtitleText, FVector2D(CenterX, PanelPosition.Y + 66.0f * LayoutScale), ApplyAlpha(FLinearColor::White), true, 0.96f * ViewScale);
+	DrawTextLine(Canvas, MediumFont, PointsText, FVector2D(CenterX, PanelPosition.Y + 94.0f * LayoutScale), ApplyAlpha(PositiveColor), true, 0.94f * ViewScale);
+	DrawWrappedTextBlock(
+		Canvas,
+		SmallFont,
+		BodyText,
+		PanelPosition + FVector2D(30.0f * LayoutScale, 122.0f * LayoutScale),
+		PanelSize.X - 60.0f * LayoutScale,
+		ApplyAlpha(MutedTextColor),
+		0.90f * ViewScale,
+		1.0f);
+	DrawTextLine(
+		Canvas,
+		MediumFont,
+		FooterText,
+		FVector2D(CenterX, PanelPosition.Y + PanelSize.Y - 36.0f * LayoutScale),
+		ApplyAlpha(FLinearColor(0.96f, 0.92f, 0.84f, 1.0f)),
+		true,
+		0.90f * ViewScale);
+}
+
 void APlayerGameHUD::DrawStaminaPanel(float ViewportHeight) const
 {
 	AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter();
@@ -1414,9 +2127,16 @@ void APlayerGameHUD::DrawInteractionPrompt(float ViewportWidth, float ViewportHe
 	DrawPanel(Canvas, PanelPosition, PanelSize);
 	DrawTextLine(Canvas, Font, PromptText.ToString(), PanelPosition + FVector2D(22.0f, 12.0f), PositiveColor);
 
-	const FString SecondaryHint = ThiefController->IsRussianLanguage()
-		? TEXT("[P] Прокачка персонажа")
-		: TEXT("[P] Character Progression");
+	const UWorkOrderSubsystem* WorkOrderSubsystem = ThiefController->GetGameInstance()
+		? ThiefController->GetGameInstance()->GetSubsystem<UWorkOrderSubsystem>()
+		: nullptr;
+	const FString SecondaryHint = WorkOrderSubsystem && WorkOrderSubsystem->IsShiftReadyToTurnIn()
+		? (ThiefController->IsRussianLanguage()
+			? TEXT("[B] Торговля   |   [P] Прокачка")
+			: TEXT("[B] Trade   |   [P] Progression"))
+		: (ThiefController->IsRussianLanguage()
+			? TEXT("[B] Торговля   |   [P] Прокачка")
+			: TEXT("[B] Trade   |   [P] Character Progression"));
 	float SecondaryTextWidth = 0.0f;
 	float SecondaryTextHeight = 0.0f;
 	Canvas->StrLen(Font, SecondaryHint, SecondaryTextWidth, SecondaryTextHeight);
@@ -1526,6 +2246,28 @@ void APlayerGameHUD::DrawTradePanel(float ViewportWidth, float ViewportHeight)
 		EHUDMenuAction::TradeBuyPotion,
 		true);
 
+	const UWorkOrderSubsystem* WorkOrderSubsystem = ThiefController && ThiefController->GetGameInstance()
+		? ThiefController->GetGameInstance()->GetSubsystem<UWorkOrderSubsystem>()
+		: nullptr;
+	if (WorkOrderSubsystem && WorkOrderSubsystem->IsShiftReadyToTurnIn())
+	{
+		const FVector2D TurnInBannerPosition = PanelPosition + FVector2D(32.0f, 492.0f);
+		const FVector2D TurnInBannerSize(PanelSize.X - 64.0f, 76.0f);
+		DrawPanel(Canvas, TurnInBannerPosition, TurnInBannerSize, FLinearColor(0.13f, 0.17f, 0.08f, 0.96f));
+		DrawTextLine(Canvas, MediumFont, bRussian ? TEXT("Заказ готов к сдаче") : TEXT("Work order ready to turn in"), TurnInBannerPosition + FVector2D(18.0f, 10.0f), AccentColor);
+		DrawTextLine(Canvas, MediumFont, bRussian ? TEXT("Нажми [E], чтобы закрыть смену и получить награду.") : TEXT("Press [E] to close the shift and collect the reward."), TurnInBannerPosition + FVector2D(18.0f, 30.0f), FLinearColor::White, false, 0.88f);
+		DrawTextLine(
+			Canvas,
+			MediumFont,
+			WorkOrderSubsystem->IsTrackedBonusCompleted(PlayerCharacter)
+				? (bRussian ? TEXT("Бонусная цель выполнена.") : TEXT("Bonus objective completed."))
+				: (bRussian ? TEXT("Бонусную цель ещё можно добить перед сдачей.") : TEXT("Bonus objective can still be finished before turn-in.")),
+			TurnInBannerPosition + FVector2D(18.0f, 52.0f),
+			WorkOrderSubsystem->IsTrackedBonusCompleted(PlayerCharacter) ? PositiveColor : MutedTextColor,
+			false,
+			0.78f);
+	}
+
 	DrawTextLine(
 		Canvas,
 		MediumFont,
@@ -1628,7 +2370,7 @@ void APlayerGameHUD::DrawProgressionPanel(float ViewportWidth, float ViewportHei
 		true);
 	DrawActionButton(
 		bRussian ? TEXT("[2] Урон по руде") : TEXT("[2] Ore Damage"),
-		bRussian ? TEXT("+1 к урону по руде") : TEXT("+1 Ore Damage"),
+		bRussian ? TEXT("+10 к урону по руде") : TEXT("+10 Ore Damage"),
 		UpgradeButtonTwo,
 		UpgradeButtonSize,
 		EHUDMenuAction::UpgradeOreDamage);
@@ -1654,13 +2396,14 @@ void APlayerGameHUD::DrawMenuButton(const FString& Label, const FVector2D& Posit
 	FLinearColor FillColor = bPrimary
 		? (bHovered ? PrimaryButtonHoveredColor : PrimaryButtonColor)
 		: (bHovered ? ButtonHoveredColor : ButtonColor);
-	if (Action == EHUDMenuAction::QuitGame)
+	if (Action == EHUDMenuAction::QuitGame || Action == EHUDMenuAction::ResetCharacterProgress || Action == EHUDMenuAction::AbandonShift)
 	{
 		FillColor = bHovered ? DangerButtonHoveredColor : DangerButtonColor;
 	}
 
 	DrawPanel(Canvas, Position, Size, FillColor);
 
+	const float TextScale = FMath::Clamp(Size.Y / 58.0f, 0.98f, 1.14f);
 	float TextWidth = 0.0f;
 	float TextHeight = 0.0f;
 	Canvas->StrLen(Font, Label, TextWidth, TextHeight);
@@ -1668,8 +2411,10 @@ void APlayerGameHUD::DrawMenuButton(const FString& Label, const FVector2D& Posit
 		Canvas,
 		Font,
 		Label,
-		Position + FVector2D((Size.X - TextWidth) * 0.5f, (Size.Y - TextHeight) * 0.5f),
-		FLinearColor::White);
+		Position + FVector2D((Size.X - TextWidth * TextScale) * 0.5f, (Size.Y - TextHeight * TextScale) * 0.5f),
+		FLinearColor::White,
+		false,
+		TextScale);
 }
 
 void APlayerGameHUD::DrawActionButton(

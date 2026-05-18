@@ -36,6 +36,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Progression")
 	void AddExperience(int32 ExperienceAmount);
 
+	UFUNCTION(BlueprintCallable, Category = "Resources")
+	void AddGold(int32 GoldAmount);
+
+	UFUNCTION(BlueprintCallable, Category = "Progression")
+	void ResetCharacterProgress();
+
 	UFUNCTION(BlueprintCallable, Category = "Trading")
 	bool SellOre(int32 OreAmount, int32 GoldPerOre);
 
@@ -66,8 +72,34 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Progression")
 	float GetOreDamageAmount() const;
 
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	int32 GetMiniQuestCount() const;
+
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	int32 GetCompletedMiniQuestCount() const;
+
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	int32 GetStaminaPotionCount() const;
+
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	int32 GetTotalOreCollected() const;
+
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	int32 GetTotalOreSold() const;
+
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	int32 GetTotalOreNodesBroken() const;
+
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	int32 GetTotalGoldEarned() const;
+
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	int32 GetTotalPotionsBought() const;
+
+	UFUNCTION(BlueprintPure, Category = "Progression")
+	int32 GetTotalPotionsUsed() const;
+
+	bool GetMiniQuestProgress(int32 QuestIndex, int32& OutCurrentProgress, int32& OutTargetProgress, bool& bOutCompleted) const;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Attack")
 	bool bIsAttacking;
@@ -126,6 +158,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory", meta = (ClampMin = "1.0"))
 	float StaminaPotionRestoreAmount;
 
+	void SetTemporaryStaminaModifiers(float DrainMultiplier, float RegenMultiplier);
 	void DecreaseStamina();
 	void IncreaseStamina();
 
@@ -193,6 +226,7 @@ private:
 	void HandleUseStaminaPotionInput();
 	void LoadCharacterDataFromJson();
 	void SaveCharacterDataToJson() const;
+	int32 GetMiniQuestCurrentValue(int32 QuestIndex) const;
 	void UpdateResourceCounter() const;
 	void UpdateStaminaBar() const;
 	void TryDamageOre();
@@ -202,6 +236,14 @@ private:
 
 	bool bCanAttack;
 	float TimeSinceLastStaminaUse;
+	int32 TotalOreCollected = 0;
+	int32 TotalOreSold = 0;
+	int32 TotalOreNodesBroken = 0;
+	int32 TotalGoldEarned = 0;
+	int32 TotalPotionsBought = 0;
+	int32 TotalPotionsUsed = 0;
+	float TemporaryStaminaDrainMultiplier = 1.0f;
+	float TemporaryStaminaRegenMultiplier = 1.0f;
 	FTimerHandle AttackCooldownHandle;
 	FTimerHandle AttackHitTimerHandle;
 	FTimerHandle AttackStateTimerHandle;

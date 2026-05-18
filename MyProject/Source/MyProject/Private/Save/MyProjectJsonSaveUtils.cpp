@@ -10,6 +10,7 @@ namespace
 	const FString JsonSaveDirectory = TEXT("JsonSaves");
 	const FString SettingsFileName = TEXT("Settings.json");
 	const FString CharacterFileName = TEXT("Character.json");
+	const FString WorkOrderFileName = TEXT("WorkOrders.json");
 }
 
 bool FMyProjectJsonSaveUtils::SaveSettingsData(const FMyProjectSettingsSaveData& SaveData)
@@ -32,6 +33,16 @@ bool FMyProjectJsonSaveUtils::LoadCharacterData(FMyProjectCharacterSaveData& Out
 	return LoadStructFromJsonFile(OutSaveData, GetCharacterSavePath());
 }
 
+bool FMyProjectJsonSaveUtils::SaveWorkOrderData(const FMyProjectWorkOrderSaveData& SaveData)
+{
+	return SaveStructToJsonFile(SaveData, GetWorkOrderSavePath());
+}
+
+bool FMyProjectJsonSaveUtils::LoadWorkOrderData(FMyProjectWorkOrderSaveData& OutSaveData)
+{
+	return LoadStructFromJsonFile(OutSaveData, GetWorkOrderSavePath());
+}
+
 FString FMyProjectJsonSaveUtils::GetSettingsSavePath()
 {
 	return FPaths::Combine(FPaths::ProjectSavedDir(), JsonSaveDirectory, SettingsFileName);
@@ -40,6 +51,11 @@ FString FMyProjectJsonSaveUtils::GetSettingsSavePath()
 FString FMyProjectJsonSaveUtils::GetCharacterSavePath()
 {
 	return FPaths::Combine(FPaths::ProjectSavedDir(), JsonSaveDirectory, CharacterFileName);
+}
+
+FString FMyProjectJsonSaveUtils::GetWorkOrderSavePath()
+{
+	return FPaths::Combine(FPaths::ProjectSavedDir(), JsonSaveDirectory, WorkOrderFileName);
 }
 
 bool FMyProjectJsonSaveUtils::EnsureSaveDirectoryExists(const FString& FilePath)
@@ -85,3 +101,5 @@ template bool FMyProjectJsonSaveUtils::SaveStructToJsonFile(const FMyProjectSett
 template bool FMyProjectJsonSaveUtils::LoadStructFromJsonFile(FMyProjectSettingsSaveData& OutSaveData, const FString& FilePath);
 template bool FMyProjectJsonSaveUtils::SaveStructToJsonFile(const FMyProjectCharacterSaveData& SaveData, const FString& FilePath);
 template bool FMyProjectJsonSaveUtils::LoadStructFromJsonFile(FMyProjectCharacterSaveData& OutSaveData, const FString& FilePath);
+template bool FMyProjectJsonSaveUtils::SaveStructToJsonFile(const FMyProjectWorkOrderSaveData& SaveData, const FString& FilePath);
+template bool FMyProjectJsonSaveUtils::LoadStructFromJsonFile(FMyProjectWorkOrderSaveData& OutSaveData, const FString& FilePath);

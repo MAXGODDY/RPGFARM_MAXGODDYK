@@ -11,6 +11,8 @@ enum class EHUDMenuAction : uint8
 {
 	None,
 	StartGame,
+	WorkOrderPrev,
+	WorkOrderNext,
 	OpenSettings,
 	CloseSettings,
 	ResumeGame,
@@ -37,7 +39,10 @@ enum class EHUDMenuAction : uint8
 	TradeBuyPotion,
 	UpgradeMaxStamina,
 	UpgradeOreDamage,
-	UpgradeMoveSpeed
+	UpgradeMoveSpeed,
+	ResetCharacterProgress,
+	CloseShiftResult,
+	AbandonShift
 };
 
 USTRUCT()
@@ -69,9 +74,12 @@ public:
 	bool HandleScroll(float WheelDelta);
 
 private:
+	void UpdateLevelUpPopupState();
 	void DrawMainMenu(float ViewportWidth, float ViewportHeight);
 	void DrawLoadingScreen(float ViewportWidth, float ViewportHeight);
 	void DrawPauseMenu(float ViewportWidth, float ViewportHeight);
+	void DrawWorkOrderPanel(float ViewportWidth, float ViewportHeight) const;
+	void DrawShiftResultScreen(float ViewportWidth, float ViewportHeight);
 	void DrawSettingsPanel(float ViewportWidth, float ViewportHeight, bool bShowBackToPause);
 	void DrawAudioSettingsSection(const class AThiefPlayerController* ThiefController, const FVector2D& PanelPosition, float PanelWidth, float Scale);
 	void DrawControlsSettingsSection(const class AThiefPlayerController* ThiefController, const FVector2D& PanelPosition, float PanelWidth, float PanelHeight, float Scale);
@@ -99,6 +107,7 @@ private:
 	void DrawInputCaptureOverlay(const class AThiefPlayerController* ThiefController, float ViewportWidth, float ViewportHeight);
 	void DrawResourcePanel(float ViewportWidth) const;
 	void DrawLevelPanel() const;
+	void DrawLevelUpPopup(float ViewportWidth, float ViewportHeight) const;
 	void DrawStaminaPanel(float ViewportHeight) const;
 	void DrawInteractionPrompt(float ViewportWidth, float ViewportHeight) const;
 	void DrawTradePanel(float ViewportWidth, float ViewportHeight);
@@ -122,4 +131,9 @@ private:
 	TArray<FHUDButtonData> ActiveButtons;
 	float ControlsBindingsScrollOffset = 0.0f;
 	float ControlsBindingsMaxScroll = 0.0f;
+	int32 LastObservedPlayerLevel = INDEX_NONE;
+	int32 LevelPopupDisplayedLevel = 0;
+	int32 LevelPopupDisplayedPoints = 0;
+	float LevelPopupStartTime = -1000.0f;
+	float LevelPopupDuration = 3.6f;
 };

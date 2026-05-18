@@ -53,6 +53,7 @@ public:
 	AThiefPlayerController();
 
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupInputComponent() override;
 	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
 
@@ -76,6 +77,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "UI")
 	bool IsLoadingGameplayMap() const;
+
+	UFUNCTION(BlueprintPure, Category = "UI")
+	bool IsShiftResultScreenOpen() const;
 
 	UFUNCTION(BlueprintPure, Category = "UI")
 	bool HasNearbyTrader() const;
@@ -147,6 +151,9 @@ public:
 	void SetActiveSettingsTab(ESettingsPanelTab NewTab);
 	void ReturnToLobby();
 	void RequestQuitGame();
+	void ResetAllProgress();
+	void DismissShiftResultScreen();
+	void AbandonActiveShift();
 	void AdjustMasterVolume(float Delta);
 	void AdjustMusicVolume(float Delta);
 	void AdjustSfxVolume(float Delta);
@@ -212,6 +219,7 @@ private:
 	bool ApplyBindingKey(ERemappableInputAction InputAction, const FKey& NewKey);
 	FKey GetCurrentBindingKey(ERemappableInputAction InputAction) const;
 	class AGameplayCharacterBase* GetPlayerCharacter() const;
+	class UWorkOrderSubsystem* GetWorkOrderSubsystem() const;
 
 	bool bTradeMenuOpen;
 	bool bProgressionMenuOpen;

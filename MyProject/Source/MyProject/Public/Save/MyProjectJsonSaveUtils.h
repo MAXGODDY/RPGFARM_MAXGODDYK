@@ -86,6 +86,42 @@ struct FMyProjectCharacterSaveData
 
 	UPROPERTY()
 	float SprintSpeed = 700.0f;
+
+	UPROPERTY()
+	int32 TotalOreCollected = 0;
+
+	UPROPERTY()
+	int32 TotalOreSold = 0;
+
+	UPROPERTY()
+	int32 TotalOreNodesBroken = 0;
+
+	UPROPERTY()
+	int32 TotalGoldEarned = 0;
+
+	UPROPERTY()
+	int32 TotalPotionsBought = 0;
+
+	UPROPERTY()
+	int32 TotalPotionsUsed = 0;
+};
+
+USTRUCT()
+struct FMyProjectWorkOrderSaveData
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	int32 Reputation = 0;
+
+	UPROPERTY()
+	int32 CompletedShiftCount = 0;
+
+	UPROPERTY()
+	int32 LastSelectedOrderIndex = 0;
+
+	UPROPERTY()
+	TArray<int32> CompletedOrderCounts;
 };
 
 class MYPROJECT_API FMyProjectJsonSaveUtils
@@ -97,9 +133,13 @@ public:
 	static bool SaveCharacterData(const FMyProjectCharacterSaveData& SaveData);
 	static bool LoadCharacterData(FMyProjectCharacterSaveData& OutSaveData);
 
+	static bool SaveWorkOrderData(const FMyProjectWorkOrderSaveData& SaveData);
+	static bool LoadWorkOrderData(FMyProjectWorkOrderSaveData& OutSaveData);
+
 private:
 	static FString GetSettingsSavePath();
 	static FString GetCharacterSavePath();
+	static FString GetWorkOrderSavePath();
 	static bool EnsureSaveDirectoryExists(const FString& FilePath);
 
 	template<typename TSaveStruct>

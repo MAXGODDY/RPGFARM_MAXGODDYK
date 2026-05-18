@@ -16,6 +16,42 @@
 #include "UI/ResourceCounterWidget.h"
 #include "UI/StaminaBarWidget.h"
 
+namespace
+{
+	constexpr float MinimumSprintStamina = 1.0f;
+
+	enum class EMiniQuestMetric : uint8
+	{
+		OreNodesBroken,
+		OreCollected,
+		OreSold,
+		PotionsBought,
+		PotionsUsed,
+		PlayerLevel
+	};
+
+	struct FMiniQuestDefinition
+	{
+		EMiniQuestMetric Metric = EMiniQuestMetric::OreNodesBroken;
+		int32 Target = 1;
+	};
+
+	const TArray<FMiniQuestDefinition>& GetMiniQuestDefinitions()
+	{
+		static const TArray<FMiniQuestDefinition> Definitions =
+		{
+			{ EMiniQuestMetric::OreNodesBroken, 3 },
+			{ EMiniQuestMetric::OreCollected, 20 },
+			{ EMiniQuestMetric::OreSold, 15 },
+			{ EMiniQuestMetric::PotionsBought, 2 },
+			{ EMiniQuestMetric::PotionsUsed, 2 },
+			{ EMiniQuestMetric::PlayerLevel, 3 }
+		};
+
+		return Definitions;
+	}
+}
+
 AGameplayCharacterBase::AGameplayCharacterBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -31,14 +67,14 @@ AGameplayCharacterBase::AGameplayCharacterBase()
 	PlusStamina = 26.0f;
 	MovingStaminaRegen = 2.5f;
 	StaminaRegenDelay = 0.85f;
-	OreDamage = 1.0f;
+	OreDamage = 50.0f;
 	AttackRange = 350.0f;
 	AttackCooldown = 0.45f;
 	AttackStateDuration = 5.2f;
 	AttackHitNormalizedTime = 0.55f;
 	BaseExperienceToNextLevel = 100;
 	MaxStaminaUpgradeAmount = 20.0f;
-	OreDamageUpgradeAmount = 1.0f;
+	OreDamageUpgradeAmount = 10.0f;
 	MoveSpeedUpgradeAmount = 30.0f;
 	bCanAttack = true;
 	bIsAttacking = false;
@@ -46,6 +82,8 @@ AGameplayCharacterBase::AGameplayCharacterBase()
 	CollectedOreResources = 0;
 	CollectedGold = 0;
 	StaminaPotionCount = 0;
+	TemporaryStaminaDrainMultiplier = 1.0f;
+	TemporaryStaminaRegenMultiplier = 1.0f;
 	PlayerLevel = 1;
 	CurrentExperience = 0;
 	ExperienceToNextLevel = BaseExperienceToNextLevel;
@@ -139,10 +177,15 @@ void AGameplayCharacterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	if (bIsSprint && Stamina <= MinimumSprintStamina)
+	{
+		SetSprintActive(false);
+	}
+
 	const bool bHasMovementIntent = HasMovementInputIntent();
 	const bool bIsActivelySprinting = bIsSprint && bHasMovementIntent;
 
-	if (bIsActivelySprinting && !FMath::IsNearlyZero(Stamina))
+	if (bIsActivelySprinting && Stamina > MinimumSprintStamina)
 	{
 		DecreaseStamina();
 	}
@@ -155,9 +198,20 @@ void AGameplayCharacterBase::Tick(float DeltaTime)
 		}
 	}
 
-	if (FMath::IsNearlyZero(Stamina) && bIsActivelySprinting)
+	if (Stamina <= MinimumSprintStamina && bIsSprint)
 	{
 		SetSprintActive(false);
+	}
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		const float DesiredWalkSpeed = (bIsSprint && bHasMovementIntent && Stamina > MinimumSprintStamina)
+			? SprintSpeed
+			: WalkSpeed;
+		if (!FMath::IsNearlyEqual(MovementComponent->MaxWalkSpeed, DesiredWalkSpeed))
+		{
+			MovementComponent->MaxWalkSpeed = DesiredWalkSpeed;
+		}
 	}
 }
 
@@ -265,7 +319,7 @@ void AGameplayCharacterBase::Attack()
 
 void AGameplayCharacterBase::SetSprintActive(const bool bShouldSprint)
 {
-	if (bShouldSprint && FMath::IsNearlyZero(Stamina))
+	if (bShouldSprint && Stamina <= MinimumSprintStamina)
 	{
 		bIsSprint = false;
 	}
@@ -299,6 +353,60 @@ void AGameplayCharacterBase::AddExperience(const int32 ExperienceAmount)
 	SaveCharacterDataToJson();
 }
 
+void AGameplayCharacterBase::AddGold(const int32 GoldAmount)
+{
+	if (GoldAmount <= 0)
+	{
+		return;
+	}
+
+	CollectedGold += GoldAmount;
+	TotalGoldEarned += GoldAmount;
+	UpdateResourceCounter();
+	SaveCharacterDataToJson();
+}
+
+void AGameplayCharacterBase::ResetCharacterProgress()
+{
+	const AGameplayCharacterBase* DefaultCharacter = GetClass()
+		? Cast<AGameplayCharacterBase>(GetClass()->GetDefaultObject())
+		: nullptr;
+
+	MaxStamina = DefaultCharacter ? DefaultCharacter->MaxStamina : 100.0f;
+	Stamina = MaxStamina;
+	CurrentStamina = Stamina;
+	CollectedOreResources = 0;
+	CollectedGold = 0;
+	StaminaPotionCount = 0;
+	PlayerLevel = 1;
+	CurrentExperience = 0;
+	ExperienceToNextLevel = DefaultCharacter ? DefaultCharacter->BaseExperienceToNextLevel : BaseExperienceToNextLevel;
+	AvailableUpgradePoints = 0;
+	OreDamage = FMath::Max(DefaultCharacter ? DefaultCharacter->OreDamage : 50.0f, 50.0f);
+	WalkSpeed = DefaultCharacter ? DefaultCharacter->WalkSpeed : 450.0f;
+	SprintSpeed = DefaultCharacter ? DefaultCharacter->SprintSpeed : 700.0f;
+	StaminaPotionRestoreAmount = DefaultCharacter ? DefaultCharacter->StaminaPotionRestoreAmount : 40.0f;
+	TotalOreCollected = 0;
+	TotalOreSold = 0;
+	TotalOreNodesBroken = 0;
+	TotalGoldEarned = 0;
+	TotalPotionsBought = 0;
+	TotalPotionsUsed = 0;
+	TemporaryStaminaDrainMultiplier = 1.0f;
+	TemporaryStaminaRegenMultiplier = 1.0f;
+	bIsSprint = false;
+	TimeSinceLastStaminaUse = StaminaRegenDelay;
+
+	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		MovementComponent->MaxWalkSpeed = WalkSpeed;
+	}
+
+	UpdateResourceCounter();
+	UpdateStaminaBar();
+	SaveCharacterDataToJson();
+}
+
 bool AGameplayCharacterBase::SellOre(const int32 OreAmount, const int32 GoldPerOre)
 {
 	if (OreAmount <= 0 || GoldPerOre <= 0 || CollectedOreResources < OreAmount)
@@ -307,7 +415,10 @@ bool AGameplayCharacterBase::SellOre(const int32 OreAmount, const int32 GoldPerO
 	}
 
 	CollectedOreResources -= OreAmount;
-	CollectedGold += OreAmount * GoldPerOre;
+	const int32 GoldEarned = OreAmount * GoldPerOre;
+	CollectedGold += GoldEarned;
+	TotalGoldEarned += GoldEarned;
+	TotalOreSold += OreAmount;
 	UpdateResourceCounter();
 	SaveCharacterDataToJson();
 	return true;
@@ -323,6 +434,7 @@ bool AGameplayCharacterBase::BuyStaminaPotion(const int32 GoldCost, const float 
 	CollectedGold -= GoldCost;
 	StaminaPotionCount += 1;
 	StaminaPotionRestoreAmount = RestoreAmount;
+	TotalPotionsBought += 1;
 	SaveCharacterDataToJson();
 	return true;
 }
@@ -350,6 +462,7 @@ bool AGameplayCharacterBase::UseStaminaPotion()
 	StaminaPotionCount -= 1;
 	Stamina = FMath::Clamp(Stamina + StaminaPotionRestoreAmount, 0.0f, MaxStamina);
 	CurrentStamina = Stamina;
+	TotalPotionsUsed += 1;
 	UpdateStaminaBar();
 	SaveCharacterDataToJson();
 	return true;
@@ -371,7 +484,7 @@ bool AGameplayCharacterBase::SpendUpgradePoint(const EPlayerUpgradeType UpgradeT
 		UpdateStaminaBar();
 		break;
 	case EPlayerUpgradeType::OreDamage:
-		OreDamage += OreDamageUpgradeAmount;
+		OreDamage += FMath::Max(OreDamageUpgradeAmount, 10.0f);
 		break;
 	case EPlayerUpgradeType::MoveSpeed:
 		WalkSpeed += MoveSpeedUpgradeAmount;
@@ -420,9 +533,82 @@ float AGameplayCharacterBase::GetOreDamageAmount() const
 	return OreDamage;
 }
 
+int32 AGameplayCharacterBase::GetMiniQuestCount() const
+{
+	return GetMiniQuestDefinitions().Num();
+}
+
+int32 AGameplayCharacterBase::GetCompletedMiniQuestCount() const
+{
+	int32 CompletedCount = 0;
+	const TArray<FMiniQuestDefinition>& QuestDefinitions = GetMiniQuestDefinitions();
+	for (int32 QuestIndex = 0; QuestIndex < QuestDefinitions.Num(); ++QuestIndex)
+	{
+		if (GetMiniQuestCurrentValue(QuestIndex) >= QuestDefinitions[QuestIndex].Target)
+		{
+			CompletedCount += 1;
+		}
+	}
+
+	return CompletedCount;
+}
+
 int32 AGameplayCharacterBase::GetStaminaPotionCount() const
 {
 	return StaminaPotionCount;
+}
+
+int32 AGameplayCharacterBase::GetTotalOreCollected() const
+{
+	return TotalOreCollected;
+}
+
+int32 AGameplayCharacterBase::GetTotalOreSold() const
+{
+	return TotalOreSold;
+}
+
+int32 AGameplayCharacterBase::GetTotalOreNodesBroken() const
+{
+	return TotalOreNodesBroken;
+}
+
+int32 AGameplayCharacterBase::GetTotalGoldEarned() const
+{
+	return TotalGoldEarned;
+}
+
+int32 AGameplayCharacterBase::GetTotalPotionsBought() const
+{
+	return TotalPotionsBought;
+}
+
+int32 AGameplayCharacterBase::GetTotalPotionsUsed() const
+{
+	return TotalPotionsUsed;
+}
+
+bool AGameplayCharacterBase::GetMiniQuestProgress(int32 QuestIndex, int32& OutCurrentProgress, int32& OutTargetProgress, bool& bOutCompleted) const
+{
+	const TArray<FMiniQuestDefinition>& QuestDefinitions = GetMiniQuestDefinitions();
+	if (!QuestDefinitions.IsValidIndex(QuestIndex))
+	{
+		OutCurrentProgress = 0;
+		OutTargetProgress = 0;
+		bOutCompleted = false;
+		return false;
+	}
+
+	OutCurrentProgress = GetMiniQuestCurrentValue(QuestIndex);
+	OutTargetProgress = QuestDefinitions[QuestIndex].Target;
+	bOutCompleted = OutCurrentProgress >= OutTargetProgress;
+	return true;
+}
+
+void AGameplayCharacterBase::SetTemporaryStaminaModifiers(const float DrainMultiplier, const float RegenMultiplier)
+{
+	TemporaryStaminaDrainMultiplier = FMath::Max(0.1f, DrainMultiplier);
+	TemporaryStaminaRegenMultiplier = FMath::Max(0.0f, RegenMultiplier);
 }
 
 void AGameplayCharacterBase::DecreaseStamina()
@@ -435,8 +621,12 @@ void AGameplayCharacterBase::DecreaseStamina()
 	}
 
 	TimeSinceLastStaminaUse = 0.0f;
-	CurrentStamina = FMath::Clamp(Stamina - (MinusStamina * DeltaTime), 0.0f, MaxStamina);
+	CurrentStamina = FMath::Clamp(Stamina - (MinusStamina * TemporaryStaminaDrainMultiplier * DeltaTime), 0.0f, MaxStamina);
 	Stamina = CurrentStamina;
+	if (Stamina <= MinimumSprintStamina && bIsSprint)
+	{
+		SetSprintActive(false);
+	}
 	UpdateStaminaBar();
 }
 
@@ -450,7 +640,7 @@ void AGameplayCharacterBase::IncreaseStamina()
 		return;
 	}
 
-	const float RegenPerSecond = HasMovementInputIntent() ? MovingStaminaRegen : PlusStamina;
+	const float RegenPerSecond = (HasMovementInputIntent() ? MovingStaminaRegen : PlusStamina) * TemporaryStaminaRegenMultiplier;
 	if (RegenPerSecond <= 0.0f)
 	{
 		return;
@@ -463,7 +653,15 @@ void AGameplayCharacterBase::IncreaseStamina()
 
 bool AGameplayCharacterBase::HasMovementInputIntent() const
 {
-	return GetLastMovementInputVector().SizeSquared2D() > FMath::Square(0.05f);
+	if (const UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
+	{
+		if (MovementComponent->GetCurrentAcceleration().SizeSquared2D() > FMath::Square(1.0f))
+		{
+			return true;
+		}
+	}
+
+	return GetPendingMovementInputVector().SizeSquared2D() > FMath::Square(0.01f);
 }
 
 void AGameplayCharacterBase::AddOreResources(const int32 ResourceAmount)
@@ -474,6 +672,7 @@ void AGameplayCharacterBase::AddOreResources(const int32 ResourceAmount)
 	}
 
 	CollectedOreResources += ResourceAmount;
+	TotalOreCollected += ResourceAmount;
 	UpdateResourceCounter();
 	SaveCharacterDataToJson();
 }
@@ -562,6 +761,7 @@ void AGameplayCharacterBase::TryDamageOre()
 		OreStone->ApplyDamageToOre(OreDamage);
 		if (bWillBreak && !OreStone->IsOreAvailable())
 		{
+			TotalOreNodesBroken += 1;
 			AddOreResources(OreStone->GetOreResourceReward());
 			AddExperience(OreStone->GetOreExperienceReward());
 		}
@@ -824,9 +1024,15 @@ void AGameplayCharacterBase::LoadCharacterDataFromJson()
 	CurrentExperience = FMath::Max(0, SaveData.CurrentExperience);
 	ExperienceToNextLevel = FMath::Max(BaseExperienceToNextLevel, SaveData.ExperienceToNextLevel);
 	AvailableUpgradePoints = FMath::Max(0, SaveData.AvailableUpgradePoints);
-	OreDamage = FMath::Max(0.0f, SaveData.OreDamage);
+	OreDamage = FMath::Max(50.0f, SaveData.OreDamage);
 	WalkSpeed = FMath::Max(1.0f, SaveData.WalkSpeed);
 	SprintSpeed = FMath::Max(WalkSpeed, SaveData.SprintSpeed);
+	TotalOreCollected = FMath::Max(0, SaveData.TotalOreCollected);
+	TotalOreSold = FMath::Max(0, SaveData.TotalOreSold);
+	TotalOreNodesBroken = FMath::Max(0, SaveData.TotalOreNodesBroken);
+	TotalGoldEarned = FMath::Max(0, SaveData.TotalGoldEarned);
+	TotalPotionsBought = FMath::Max(0, SaveData.TotalPotionsBought);
+	TotalPotionsUsed = FMath::Max(0, SaveData.TotalPotionsUsed);
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
 	{
@@ -849,5 +1055,38 @@ void AGameplayCharacterBase::SaveCharacterDataToJson() const
 	SaveData.OreDamage = OreDamage;
 	SaveData.WalkSpeed = WalkSpeed;
 	SaveData.SprintSpeed = SprintSpeed;
+	SaveData.TotalOreCollected = TotalOreCollected;
+	SaveData.TotalOreSold = TotalOreSold;
+	SaveData.TotalOreNodesBroken = TotalOreNodesBroken;
+	SaveData.TotalGoldEarned = TotalGoldEarned;
+	SaveData.TotalPotionsBought = TotalPotionsBought;
+	SaveData.TotalPotionsUsed = TotalPotionsUsed;
 	FMyProjectJsonSaveUtils::SaveCharacterData(SaveData);
+}
+
+int32 AGameplayCharacterBase::GetMiniQuestCurrentValue(int32 QuestIndex) const
+{
+	const TArray<FMiniQuestDefinition>& QuestDefinitions = GetMiniQuestDefinitions();
+	if (!QuestDefinitions.IsValidIndex(QuestIndex))
+	{
+		return 0;
+	}
+
+	switch (QuestDefinitions[QuestIndex].Metric)
+	{
+	case EMiniQuestMetric::OreNodesBroken:
+		return TotalOreNodesBroken;
+	case EMiniQuestMetric::OreCollected:
+		return TotalOreCollected;
+	case EMiniQuestMetric::OreSold:
+		return TotalOreSold;
+	case EMiniQuestMetric::PotionsBought:
+		return TotalPotionsBought;
+	case EMiniQuestMetric::PotionsUsed:
+		return TotalPotionsUsed;
+	case EMiniQuestMetric::PlayerLevel:
+		return PlayerLevel;
+	default:
+		return 0;
+	}
 }

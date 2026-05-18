@@ -12,6 +12,8 @@ class MYPROJECT_API ATraderNPC : public AActor
 public:
 	ATraderNPC();
 
+	virtual void Tick(float DeltaTime) override;
+
 	UFUNCTION(BlueprintPure, Category = "Trader")
 	FText GetTraderName() const;
 
@@ -25,10 +27,34 @@ protected:
 	TObjectPtr<class UStaticMeshComponent> TraderMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Trader")
+	TObjectPtr<class USkeletalMeshComponent> TraderCharacterMesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Trader")
 	TObjectPtr<class USphereComponent> InteractionSphere;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trader")
 	FText TraderName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trader|Visual")
+	TObjectPtr<class UAnimationAsset> TraderIdleAnimation;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trader|LookAt", meta = (ClampMin = "0.0"))
+	float LookAtPlayerDistance;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trader|LookAt", meta = (ClampMin = "0.0"))
+	float LookAtRotationInterpSpeed;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trader|LookAt", meta = (ClampMin = "-180.0", ClampMax = "180.0"))
+	float LookAtYawOffsetDegrees;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trader|Visual")
+	FVector TraderCharacterRelativeLocation;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trader|Visual")
+	FRotator TraderCharacterRelativeRotation;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Trader|Visual")
+	FVector TraderCharacterRelativeScale;
 
 private:
 	UFUNCTION()
@@ -46,4 +72,6 @@ private:
 		AActor* OtherActor,
 		UPrimitiveComponent* OtherComp,
 		int32 OtherBodyIndex);
+
+	FRotator InitialActorRotation;
 };

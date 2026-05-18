@@ -15,6 +15,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/PackageName.h"
 #include "Save/MyProjectJsonSaveUtils.h"
+#include "Systems/WorkOrderSubsystem.h"
 #include "GameplayCharacterBase.h"
 #include "UI/PlayerGameHUD.h"
 #include "UObject/ConstructorHelpers.h"
@@ -288,6 +289,30 @@ void AThiefPlayerController::BeginPlay()
 		0.25f);
 }
 
+void AThiefPlayerController::Tick(const float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (bLoadingGameplayMap || IsInMenuMap())
+	{
+		return;
+	}
+
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+		{
+			WorkOrderSubsystem->TryStartPendingShift(PlayerCharacter, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f);
+			WorkOrderSubsystem->UpdateTrackedShift(PlayerCharacter, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f);
+			WorkOrderSubsystem->ApplyActiveShiftEffects(PlayerCharacter);
+			if (WorkOrderSubsystem->HasResolvedShiftResult())
+			{
+				ApplyMenuInputState();
+			}
+		}
+	}
+}
+
 void AThiefPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -409,12 +434,18 @@ bool AThiefPlayerController::IsSettingsMenuOpen() const
 
 bool AThiefPlayerController::IsAnyModalOpen() const
 {
-	return bTradeMenuOpen || bProgressionMenuOpen || bPauseMenuOpen || bSettingsMenuOpen || IsInMenuMap();
+	return bTradeMenuOpen || bProgressionMenuOpen || bPauseMenuOpen || bSettingsMenuOpen || IsShiftResultScreenOpen() || IsInMenuMap();
 }
 
 bool AThiefPlayerController::IsLoadingGameplayMap() const
 {
 	return bLoadingGameplayMap;
+}
+
+bool AThiefPlayerController::IsShiftResultScreenOpen() const
+{
+	const UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem();
+	return WorkOrderSubsystem && WorkOrderSubsystem->HasResolvedShiftResult();
 }
 
 bool AThiefPlayerController::HasNearbyTrader() const
@@ -427,6 +458,16 @@ FText AThiefPlayerController::GetNearbyTraderPromptText() const
 	if (!NearbyTrader.IsValid())
 	{
 		return FText::GetEmpty();
+	}
+
+	if (const UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		if (WorkOrderSubsystem->IsShiftReadyToTurnIn())
+		{
+			return CurrentLanguage == EGameLanguage::Russian
+				? FText::FromString(TEXT("[E] Сдать заказ"))
+				: FText::FromString(TEXT("[E] Turn In Order"));
+		}
 	}
 
 	return CurrentLanguage == EGameLanguage::Russian
@@ -584,6 +625,12 @@ void AThiefPlayerController::StartGameplayFromMenu()
 	CancelInputRebind();
 	bSettingsMenuOpen = false;
 	bLoadingGameplayMap = true;
+
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		WorkOrderSubsystem->PrepareSelectedOrderForLaunch();
+	}
+
 	ApplyMenuInputState();
 	UpdateLobbyMusic();
 
@@ -678,6 +725,10 @@ void AThiefPlayerController::ReturnToLobby()
 	bLoadingGameplayMap = false;
 	NearbyTrader = nullptr;
 	CloseAllMenus();
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		WorkOrderSubsystem->NotifyReturnedToLobby();
+	}
 	UpdateLobbyMusic();
 	UGameplayStatics::OpenLevel(this, MenuMapName);
 }
@@ -685,6 +736,56 @@ void AThiefPlayerController::ReturnToLobby()
 void AThiefPlayerController::RequestQuitGame()
 {
 	UKismetSystemLibrary::QuitGame(this, this, EQuitPreference::Quit, false);
+}
+
+void AThiefPlayerController::ResetAllProgress()
+{
+	if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+	{
+		PlayerCharacter->ResetCharacterProgress();
+	}
+
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		WorkOrderSubsystem->ResetPersistentProgress();
+	}
+}
+
+void AThiefPlayerController::DismissShiftResultScreen()
+{
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		WorkOrderSubsystem->DismissShiftResult();
+	}
+
+	if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+	{
+		PlayerCharacter->SetTemporaryStaminaModifiers(1.0f, 1.0f);
+	}
+
+	ApplyMenuInputState();
+}
+
+void AThiefPlayerController::AbandonActiveShift()
+{
+	UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem();
+	AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter();
+	if (!WorkOrderSubsystem || !WorkOrderSubsystem->AbandonTrackedShift(PlayerCharacter))
+	{
+		return;
+	}
+
+	if (PlayerCharacter)
+	{
+		PlayerCharacter->SetTemporaryStaminaModifiers(1.0f, 1.0f);
+	}
+
+	bPauseMenuOpen = false;
+	bTradeMenuOpen = false;
+	bProgressionMenuOpen = false;
+	bSettingsMenuOpen = false;
+	CancelInputRebind();
+	ApplyMenuInputState();
 }
 
 void AThiefPlayerController::AdjustMasterVolume(const float Delta)
@@ -984,7 +1085,7 @@ void AThiefPlayerController::SaveSettingsToJson() const
 
 void AThiefPlayerController::ApplyMenuInputState()
 {
-	const bool bMenuLocked = bTradeMenuOpen || bProgressionMenuOpen || bPauseMenuOpen || bSettingsMenuOpen || IsInMenuMap();
+	const bool bMenuLocked = bTradeMenuOpen || bProgressionMenuOpen || bPauseMenuOpen || bSettingsMenuOpen || IsShiftResultScreenOpen() || IsInMenuMap();
 	ResetIgnoreMoveInput();
 	ResetIgnoreLookInput();
 	if (bMenuLocked)
@@ -1231,6 +1332,26 @@ void AThiefPlayerController::HandleInteractAction()
 		}
 	}
 
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		if (WorkOrderSubsystem->IsShiftReadyToTurnIn())
+		{
+			if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+			{
+				int32 GoldReward = 0;
+				int32 ExperienceReward = 0;
+				int32 ReputationReward = 0;
+				if (WorkOrderSubsystem->CompleteTrackedShift(PlayerCharacter, GoldReward, ExperienceReward, ReputationReward))
+				{
+					bTradeMenuOpen = false;
+					bProgressionMenuOpen = false;
+					ApplyMenuInputState();
+					return;
+				}
+			}
+		}
+	}
+
 	bTradeMenuOpen = !bTradeMenuOpen;
 	if (bTradeMenuOpen)
 	{
@@ -1242,6 +1363,12 @@ void AThiefPlayerController::HandleInteractAction()
 
 void AThiefPlayerController::HandlePrimaryConfirm()
 {
+	if (IsShiftResultScreenOpen())
+	{
+		DismissShiftResultScreen();
+		return;
+	}
+
 	if (IsInMenuMap())
 	{
 		if (bSettingsMenuOpen)
@@ -1264,6 +1391,12 @@ void AThiefPlayerController::HandleBackAction()
 {
 	if (bLoadingGameplayMap)
 	{
+		return;
+	}
+
+	if (IsShiftResultScreenOpen())
+	{
+		DismissShiftResultScreen();
 		return;
 	}
 
@@ -1476,4 +1609,9 @@ FKey AThiefPlayerController::GetCurrentBindingKey(const ERemappableInputAction I
 AGameplayCharacterBase* AThiefPlayerController::GetPlayerCharacter() const
 {
 	return Cast<AGameplayCharacterBase>(GetPawn());
+}
+
+UWorkOrderSubsystem* AThiefPlayerController::GetWorkOrderSubsystem() const
+{
+	return GetGameInstance() ? GetGameInstance()->GetSubsystem<UWorkOrderSubsystem>() : nullptr;
 }
