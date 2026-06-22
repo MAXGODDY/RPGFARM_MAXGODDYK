@@ -449,6 +449,7 @@ void AGameplayCharacterBase::ResetCharacterProgress()
 	TemporaryStaminaDrainMultiplier = 1.0f;
 	TemporaryStaminaRegenMultiplier = 1.0f;
 	bIsSprint = false;
+	bStaminaExhausted = false;
 	TimeSinceLastStaminaUse = StaminaRegenDelay;
 
 	if (UCharacterMovementComponent* MovementComponent = GetCharacterMovement())
