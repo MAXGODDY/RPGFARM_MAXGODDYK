@@ -1,3 +1,13 @@
+// ============================================================================
+//  UWorkOrderSubsystem — система рабочих заказов и смен.
+//  Это Subsystem: я держу заказы, репутацию и прогресс смен отдельно от объектов
+//  на карте. Игрок выбирает заказ в лобби, запускает смену, выполняет цель за
+//  отведённое время и получает награду; данные сохраняются в WorkOrders.json.
+//  ЗАЩИТА (этап 9): открываю, когда показываю выбор заказа и смену.
+//  Главное: CycleSelectedWorkOrder()/PrepareSelectedOrderForLaunch() — выбор и
+//  запуск; UpdateTrackedShift() — прогресс; CompleteTrackedShift()/Abandon… —
+//  сдача/отмена; GetReputation()/GetCompletedShiftCount() — статистика.
+// ============================================================================
 #include "Systems/WorkOrderSubsystem.h"
 
 #include "GameplayCharacterBase.h"
