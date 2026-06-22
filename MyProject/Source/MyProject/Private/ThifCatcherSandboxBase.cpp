@@ -2,7 +2,8 @@
 
 #include "Components/InputComponent.h"
 
-AThifCatcherSandboxBase::AThifCatcherSandboxBase()
+AThifCatcherSandboxBase::AThifCatcherSandboxBase(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	JumpAnimation = nullptr;
 }

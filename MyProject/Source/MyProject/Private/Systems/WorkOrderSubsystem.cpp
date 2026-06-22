@@ -246,18 +246,13 @@ bool UWorkOrderSubsystem::CycleSelectedWorkOrder(const int32 Direction)
 		return false;
 	}
 
+	// Cycle through every order (including locked ones) so the lobby arrows always
+	// respond. Locked orders can be browsed for their details but the launch path
+	// (PrepareSelectedOrderForLaunch) still falls back to a valid unlocked order.
 	const int32 Step = Direction > 0 ? 1 : -1;
-	int32 CandidateIndex = SelectedOrderIndex;
-	for (int32 Attempt = 0; Attempt < WorkOrders.Num(); ++Attempt)
-	{
-		CandidateIndex = (CandidateIndex + Step + WorkOrders.Num()) % WorkOrders.Num();
-		if (IsOrderUnlocked(CandidateIndex))
-		{
-			return SelectWorkOrder(CandidateIndex);
-		}
-	}
-
-	return false;
+	SelectedOrderIndex = (SelectedOrderIndex + Step + WorkOrders.Num()) % WorkOrders.Num();
+	SavePersistentData();
+	return true;
 }
 
 int32 UWorkOrderSubsystem::GetSelectedWorkOrderIndex() const

@@ -20,7 +20,13 @@ class MYPROJECT_API AGameplayCharacterBase : public ACharacter
 	GENERATED_BODY()
 
 public:
-	AGameplayCharacterBase();
+	AGameplayCharacterBase(const FObjectInitializer& ObjectInitializer);
+
+	// True while stamina is fully drained and sprint is locked out. Used by the
+	// custom movement component to hard-cap speed even if a Blueprint forces it,
+	// and exposed to Blueprints so the sprint/gait input can be gated by stamina.
+	UFUNCTION(BlueprintPure, Category = "Stamina")
+	bool IsStaminaExhausted() const { return bStaminaExhausted; }
 
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -149,6 +155,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stamina", meta = (ClampMin = "0.0"))
 	float StaminaRegenDelay;
 
+	// Once stamina is fully drained, sprint stays locked until it recovers back up to
+	// this value. Prevents re-sprinting at (almost) zero stamina.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stamina", meta = (ClampMin = "0.0"))
+	float StaminaSprintRecoveryThreshold;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Stamina", meta = (ClampMin = "0"))
 	float Stamina;
 
@@ -157,6 +168,17 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Inventory", meta = (ClampMin = "1.0"))
 	float StaminaPotionRestoreAmount;
+
+	// If the character ever drops more than this many units below the ground it was
+	// last standing on, it is teleported back to the spawn point instead of falling
+	// out of the world.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement", meta = (ClampMin = "200.0"))
+	float FallRecoveryDropDistance;
+
+	// Absolute world height below which the character is always recovered, no matter
+	// how it got there (catches sliding off a slope into the void).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	float FallRecoveryKillZ;
 
 	void SetTemporaryStaminaModifiers(float DrainMultiplier, float RegenMultiplier);
 	void DecreaseStamina();
@@ -235,6 +257,10 @@ private:
 	void AttachPickaxeToAttachedVisual();
 
 	bool bCanAttack;
+	bool bStaminaExhausted;
+	bool bHasGroundedLocation;
+	FVector LastGroundedLocation;
+	FVector InitialSpawnLocation;
 	float TimeSinceLastStaminaUse;
 	int32 TotalOreCollected = 0;
 	int32 TotalOreSold = 0;

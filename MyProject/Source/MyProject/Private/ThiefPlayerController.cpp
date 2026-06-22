@@ -941,6 +941,40 @@ void AThiefPlayerController::ExecuteMenuOption(const int32 OptionIndex)
 	}
 }
 
+void AThiefPlayerController::SetSettingValueFromRatio(const EHUDSliderTarget Target, const float Ratio)
+{
+	const float ClampedRatio = FMath::Clamp(Ratio, 0.0f, 1.0f);
+	switch (Target)
+	{
+	case EHUDSliderTarget::MasterVolume:
+		MasterVolumeSetting = ClampedRatio;
+		ApplyAudioSettings();
+		break;
+	case EHUDSliderTarget::MusicVolume:
+		MusicVolumeSetting = ClampedRatio;
+		UpdateLobbyMusic();
+		break;
+	case EHUDSliderTarget::SfxVolume:
+		SfxVolumeSetting = ClampedRatio;
+		ApplyWorldAudioVolumes();
+		break;
+	case EHUDSliderTarget::LookSensitivity:
+		LookSensitivitySetting = FMath::Clamp(MinLookSensitivity + ClampedRatio * (MaxLookSensitivity - MinLookSensitivity), MinLookSensitivity, MaxLookSensitivity);
+		ApplyLookSettings();
+		break;
+	case EHUDSliderTarget::MenuScale:
+		MenuScaleSetting = FMath::Clamp(MinMenuScale + ClampedRatio * (MaxMenuScale - MinMenuScale), MinMenuScale, MaxMenuScale);
+		break;
+	default:
+		break;
+	}
+}
+
+void AThiefPlayerController::PersistSettingsToDisk() const
+{
+	SaveSettingsToJson();
+}
+
 void AThiefPlayerController::LoadSettingsFromJson()
 {
 	EnsureInputMappingsExist();

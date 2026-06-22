@@ -10,6 +10,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Save/MyProjectJsonSaveUtils.h"
+#include "ThiefCharacterMovementComponent.h"
 #include "ThiefPlayerController.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
@@ -52,7 +53,8 @@ namespace
 	}
 }
 
-AGameplayCharacterBase::AGameplayCharacterBase()
+AGameplayCharacterBase::AGameplayCharacterBase(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UThiefCharacterMovementComponent>(ACharacter::CharacterMovementComponentName))
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
@@ -63,10 +65,11 @@ AGameplayCharacterBase::AGameplayCharacterBase()
 	MaxStamina = 100.0f;
 	Stamina = MaxStamina;
 	CurrentStamina = Stamina;
-	MinusStamina = 32.0f;
+	MinusStamina = 15.0f;
 	PlusStamina = 26.0f;
-	MovingStaminaRegen = 2.5f;
+	MovingStaminaRegen = 6.0f;
 	StaminaRegenDelay = 0.85f;
+	StaminaSprintRecoveryThreshold = 25.0f;
 	OreDamage = 50.0f;
 	AttackRange = 350.0f;
 	AttackCooldown = 0.45f;
@@ -78,6 +81,12 @@ AGameplayCharacterBase::AGameplayCharacterBase()
 	MoveSpeedUpgradeAmount = 30.0f;
 	bCanAttack = true;
 	bIsAttacking = false;
+	bStaminaExhausted = false;
+	bHasGroundedLocation = false;
+	LastGroundedLocation = FVector::ZeroVector;
+	InitialSpawnLocation = FVector::ZeroVector;
+	FallRecoveryDropDistance = 1500.0f;
+	FallRecoveryKillZ = -2000.0f;
 	TimeSinceLastStaminaUse = StaminaRegenDelay;
 	CollectedOreResources = 0;
 	CollectedGold = 0;
@@ -141,6 +150,10 @@ void AGameplayCharacterBase::BeginPlay()
 	UpdateResourceCounter();
 	UpdateStaminaBar();
 
+	InitialSpawnLocation = GetActorLocation();
+	LastGroundedLocation = InitialSpawnLocation;
+	bHasGroundedLocation = true;
+
 	SyncAttachedVisualInputState();
 	AttachPickaxeToAttachedVisual();
 	GetWorldTimerManager().SetTimerForNextTick(this, &AGameplayCharacterBase::SyncAttachedVisualInputState);
@@ -177,9 +190,17 @@ void AGameplayCharacterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (bIsSprint && Stamina <= MinimumSprintStamina)
+	if (Stamina <= MinimumSprintStamina)
 	{
-		SetSprintActive(false);
+		bStaminaExhausted = true;
+		if (bIsSprint)
+		{
+			SetSprintActive(false);
+		}
+	}
+	else if (bStaminaExhausted && Stamina >= FMath::Min(StaminaSprintRecoveryThreshold, MaxStamina))
+	{
+		bStaminaExhausted = false;
 	}
 
 	const bool bHasMovementIntent = HasMovementInputIntent();
@@ -211,6 +232,28 @@ void AGameplayCharacterBase::Tick(float DeltaTime)
 		if (!FMath::IsNearlyEqual(MovementComponent->MaxWalkSpeed, DesiredWalkSpeed))
 		{
 			MovementComponent->MaxWalkSpeed = DesiredWalkSpeed;
+		}
+
+		// Fall-out-of-world recovery: remember the last spot we stood on, and if we
+		// fall far below it (or below the absolute kill height), snap back to the
+		// spawn point instead of falling out of the world.
+		const FVector CurrentLocation = GetActorLocation();
+		if (MovementComponent->IsMovingOnGround())
+		{
+			LastGroundedLocation = CurrentLocation;
+			bHasGroundedLocation = true;
+		}
+
+		const bool bFellBelowGround = bHasGroundedLocation
+			&& !MovementComponent->IsMovingOnGround()
+			&& CurrentLocation.Z < LastGroundedLocation.Z - FallRecoveryDropDistance;
+		const bool bFellBelowKillZ = CurrentLocation.Z < FallRecoveryKillZ;
+		if (bFellBelowGround || bFellBelowKillZ)
+		{
+			MovementComponent->StopMovementImmediately();
+			SetActorLocation(InitialSpawnLocation + FVector(0.0f, 0.0f, 80.0f), false, nullptr, ETeleportType::TeleportPhysics);
+			MovementComponent->Velocity = FVector::ZeroVector;
+			LastGroundedLocation = InitialSpawnLocation;
 		}
 	}
 }
@@ -319,7 +362,7 @@ void AGameplayCharacterBase::Attack()
 
 void AGameplayCharacterBase::SetSprintActive(const bool bShouldSprint)
 {
-	if (bShouldSprint && Stamina <= MinimumSprintStamina)
+	if (bShouldSprint && (bStaminaExhausted || Stamina <= MinimumSprintStamina))
 	{
 		bIsSprint = false;
 	}
@@ -623,9 +666,13 @@ void AGameplayCharacterBase::DecreaseStamina()
 	TimeSinceLastStaminaUse = 0.0f;
 	CurrentStamina = FMath::Clamp(Stamina - (MinusStamina * TemporaryStaminaDrainMultiplier * DeltaTime), 0.0f, MaxStamina);
 	Stamina = CurrentStamina;
-	if (Stamina <= MinimumSprintStamina && bIsSprint)
+	if (Stamina <= MinimumSprintStamina)
 	{
-		SetSprintActive(false);
+		bStaminaExhausted = true;
+		if (bIsSprint)
+		{
+			SetSprintActive(false);
+		}
 	}
 	UpdateStaminaBar();
 }

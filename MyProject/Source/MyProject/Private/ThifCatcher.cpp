@@ -3,8 +3,8 @@
 #include "Components/InputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
-AThifCatcher::AThifCatcher()
-	: Super()
+AThifCatcher::AThifCatcher(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComponent"));
 	SpringArm->SetupAttachment(RootComponent);

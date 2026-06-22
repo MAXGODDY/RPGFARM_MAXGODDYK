@@ -5,6 +5,7 @@
 #include "Engine/Font.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "InputCoreTypes.h"
 #include "Math/UnrealMathUtility.h"
 #include "ThiefPlayerController.h"
 #include "GameplayCharacterBase.h"
@@ -326,6 +327,7 @@ void APlayerGameHUD::DrawHUD()
 	}
 
 	ActiveButtons.Reset();
+	ActiveSliders.Reset();
 
 	const float ViewportWidth = Canvas->SizeX;
 	const float ViewportHeight = Canvas->SizeY;
@@ -333,6 +335,10 @@ void APlayerGameHUD::DrawHUD()
 	{
 		return;
 	}
+
+	// Cache the cursor position once per frame so per-button hover tests do not
+	// query the player controller dozens of times while drawing the menus.
+	CachedMousePosition = GetMousePosition();
 
 	UpdateLevelUpPopupState();
 
@@ -348,6 +354,7 @@ void APlayerGameHUD::DrawHUD()
 		{
 			DrawLoadingScreen(ViewportWidth, ViewportHeight);
 		}
+		UpdateActiveSliderDrag();
 		return;
 	}
 
@@ -398,6 +405,8 @@ void APlayerGameHUD::DrawHUD()
 			DrawSettingsPanel(ViewportWidth, ViewportHeight, ThiefController->IsPauseMenuOpen());
 		}
 	}
+
+	UpdateActiveSliderDrag();
 }
 
 void APlayerGameHUD::UpdateLevelUpPopupState()
@@ -440,6 +449,24 @@ bool APlayerGameHUD::HandleClick(const FVector2D& ScreenPosition)
 	if (!ThiefController)
 	{
 		return false;
+	}
+
+	// Sliders take priority over buttons: a press on the bar grabs it for dragging
+	// and immediately jumps the value to the click position.
+	for (int32 Index = ActiveSliders.Num() - 1; Index >= 0; --Index)
+	{
+		const FHUDSliderData& Slider = ActiveSliders[Index];
+		const bool bInsideX = ScreenPosition.X >= Slider.Position.X && ScreenPosition.X <= (Slider.Position.X + Slider.Size.X);
+		const bool bInsideY = ScreenPosition.Y >= Slider.Position.Y && ScreenPosition.Y <= (Slider.Position.Y + Slider.Size.Y);
+		if (!bInsideX || !bInsideY)
+		{
+			continue;
+		}
+
+		ActiveDragSlider = Slider.Target;
+		const float Ratio = FMath::Clamp((ScreenPosition.X - Slider.Position.X) / FMath::Max(Slider.Size.X, 1.0f), 0.0f, 1.0f);
+		ThiefController->SetSettingValueFromRatio(Slider.Target, Ratio);
+		return true;
 	}
 
 	for (int32 Index = ActiveButtons.Num() - 1; Index >= 0; --Index)
@@ -774,6 +801,7 @@ void APlayerGameHUD::DrawMainMenu(float ViewportWidth, float ViewportHeight)
 	DrawMenuButton(TEXT("<"), OrderPanelPosition + FVector2D(18.0f * EffectiveScale, 52.0f * EffectiveScale), SwitchButtonSize, EHUDMenuAction::WorkOrderPrev);
 	DrawMenuButton(TEXT(">"), OrderPanelPosition + FVector2D(OrderPanelSize.X - 18.0f * EffectiveScale - SwitchButtonSize.X, 52.0f * EffectiveScale), SwitchButtonSize, EHUDMenuAction::WorkOrderNext, true);
 
+	const bool bSelectedOrderLocked = SelectedWorkOrder && WorkOrderSubsystem && !WorkOrderSubsystem->IsOrderUnlocked(SelectedOrderIndex);
 	DrawTextLine(
 		Canvas,
 		SmallFont,
@@ -781,7 +809,7 @@ void APlayerGameHUD::DrawMainMenu(float ViewportWidth, float ViewportHeight)
 			? WorkOrderSubsystem->GetOrderTitle(SelectedOrderIndex, ThiefController->IsRussianLanguage())
 			: LocalizeText(ThiefController, TEXT("No order"), TEXT("Заказ не выбран")),
 		OrderPanelPosition + FVector2D(OrderPanelSize.X * 0.5f, 60.0f * EffectiveScale),
-		FLinearColor::White,
+		bSelectedOrderLocked ? FLinearColor(1.0f, 0.55f, 0.45f, 1.0f) : FLinearColor::White,
 		true,
 		0.92f * TextScale);
 	DrawTextLine(
@@ -858,6 +886,22 @@ void APlayerGameHUD::DrawMainMenu(float ViewportWidth, float ViewportHeight)
 			MutedTextColor,
 			false,
 			0.70f * TextScale);
+	}
+
+	if (bSelectedOrderLocked)
+	{
+		const FWorkOrderDefinition* LockedDefinition = WorkOrderSubsystem ? WorkOrderSubsystem->GetWorkOrderDefinition(SelectedOrderIndex) : nullptr;
+		const int32 RequiredShifts = LockedDefinition ? LockedDefinition->RequiredCompletedShifts : 0;
+		DrawTextLine(
+			Canvas,
+			SmallFont,
+			ThiefController->IsRussianLanguage()
+				? FString::Printf(TEXT("Заблокировано - закрой смен: %d"), RequiredShifts)
+				: FString::Printf(TEXT("Locked - complete %d shifts"), RequiredShifts),
+			OrderPanelPosition + FVector2D(OrderPanelSize.X * 0.5f, OrderPanelSize.Y - 16.0f * EffectiveScale),
+			FLinearColor(1.0f, 0.55f, 0.45f, 1.0f),
+			true,
+			0.74f * TextScale);
 	}
 
 	DrawTextLine(
@@ -1375,6 +1419,12 @@ void APlayerGameHUD::DrawSettingsPanel(float ViewportWidth, float ViewportHeight
 		return;
 	}
 
+	// The settings panel is always the top-most full-screen modal. Drop any buttons
+	// registered by the layers underneath it (lobby / pause menu) so a click that
+	// lands on a gap in the settings panel can never trigger a hidden button such as
+	// Quit Game or Reset Progress.
+	ActiveButtons.Reset();
+
 	const float MenuScale = ThiefController->GetMenuScaleSetting();
 	const float EffectiveScale = FMath::Clamp(
 		MenuScale * FMath::Min(ViewportWidth / 1920.0f, ViewportHeight / 1080.0f),
@@ -1478,7 +1528,8 @@ void APlayerGameHUD::DrawAudioSettingsSection(const AThiefPlayerController* Thie
 		Scale,
 		EHUDMenuAction::MasterVolumeDown,
 		EHUDMenuAction::MasterVolumeUp,
-		ThiefController->GetMasterVolumeSetting());
+		ThiefController->GetMasterVolumeSetting(),
+		EHUDSliderTarget::MasterVolume);
 	DrawSettingValueRow(
 		LocalizeText(ThiefController, TEXT("Music Volume"), TEXT("Громкость музыки")),
 		FString::Printf(TEXT("%d%%"), FMath::RoundToInt(ThiefController->GetMusicVolumeSetting() * 100.0f)),
@@ -1487,7 +1538,8 @@ void APlayerGameHUD::DrawAudioSettingsSection(const AThiefPlayerController* Thie
 		Scale,
 		EHUDMenuAction::MusicDown,
 		EHUDMenuAction::MusicUp,
-		ThiefController->GetMusicVolumeSetting());
+		ThiefController->GetMusicVolumeSetting(),
+		EHUDSliderTarget::MusicVolume);
 	DrawSettingValueRow(
 		LocalizeText(ThiefController, TEXT("SFX Volume"), TEXT("Громкость эффектов")),
 		FString::Printf(TEXT("%d%%"), FMath::RoundToInt(ThiefController->GetSfxVolumeSetting() * 100.0f)),
@@ -1496,7 +1548,8 @@ void APlayerGameHUD::DrawAudioSettingsSection(const AThiefPlayerController* Thie
 		Scale,
 		EHUDMenuAction::SfxDown,
 		EHUDMenuAction::SfxUp,
-		ThiefController->GetSfxVolumeSetting());
+		ThiefController->GetSfxVolumeSetting(),
+		EHUDSliderTarget::SfxVolume);
 
 	DrawTextLine(
 		Canvas,
@@ -1544,7 +1597,7 @@ void APlayerGameHUD::DrawControlsSettingsSection(const AThiefPlayerController* T
 		MutedTextColor);
 
 	const FVector2D InputCardPosition = PanelPosition + FVector2D(0.0f, 78.0f * Scale);
-	const FVector2D InputCardSize(PanelWidth, 118.0f * Scale);
+	const FVector2D InputCardSize(PanelWidth, 170.0f * Scale);
 	FCanvasTileItem InputCard(InputCardPosition, InputCardSize, FLinearColor(0.10f, 0.12f, 0.15f, 0.92f));
 	InputCard.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(InputCard);
@@ -1556,20 +1609,21 @@ void APlayerGameHUD::DrawControlsSettingsSection(const AThiefPlayerController* T
 	DrawSettingValueRow(
 		LocalizeText(ThiefController, TEXT("Mouse Sensitivity"), TEXT("Чувствительность мыши")),
 		FString::Printf(TEXT("%.2f"), ThiefController->GetLookSensitivitySetting()),
-		InputCardPosition + FVector2D(18.0f * Scale, 28.0f * Scale),
+		InputCardPosition + FVector2D(18.0f * Scale, 30.0f * Scale),
 		PanelWidth - 36.0f * Scale,
 		Scale,
 		EHUDMenuAction::LookSensitivityDown,
 		EHUDMenuAction::LookSensitivityUp,
-		(ThiefController->GetLookSensitivitySetting() - 0.02f) / (0.20f - 0.02f));
+		(ThiefController->GetLookSensitivitySetting() - 0.02f) / (0.20f - 0.02f),
+		EHUDSliderTarget::LookSensitivity);
 
 	const FVector2D ToggleSize(220.0f * Scale, 44.0f * Scale);
-	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Invert Y"), TEXT("Инверсия Y")), InputCardPosition + FVector2D(18.0f * Scale, 84.0f * Scale), FLinearColor::White);
+	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Invert Y"), TEXT("Инверсия Y")), InputCardPosition + FVector2D(18.0f * Scale, 112.0f * Scale), FLinearColor::White);
 	DrawMenuButton(
 		ThiefController->IsLookYInverted()
 			? LocalizeText(ThiefController, TEXT("Enabled"), TEXT("Включено"))
 			: LocalizeText(ThiefController, TEXT("Disabled"), TEXT("Выключено")),
-		InputCardPosition + FVector2D(PanelWidth - ToggleSize.X - 18.0f * Scale, 66.0f * Scale),
+		InputCardPosition + FVector2D(PanelWidth - ToggleSize.X - 18.0f * Scale, 106.0f * Scale),
 		ToggleSize,
 		EHUDMenuAction::ToggleInvertLookY,
 		ThiefController->IsLookYInverted());
@@ -1669,7 +1723,8 @@ void APlayerGameHUD::DrawInterfaceSettingsSection(const AThiefPlayerController* 
 		Scale,
 		EHUDMenuAction::MenuScaleDown,
 		EHUDMenuAction::MenuScaleUp,
-		(ThiefController->GetMenuScaleSetting() - 0.85f) / (1.25f - 0.85f));
+		(ThiefController->GetMenuScaleSetting() - 0.85f) / (1.25f - 0.85f),
+		EHUDSliderTarget::MenuScale);
 
 	DrawTextLine(Canvas, MediumFont, LocalizeText(ThiefController, TEXT("Language"), TEXT("Язык")), CardPosition + FVector2D(24.0f * Scale, 144.0f * Scale), FLinearColor::White);
 	DrawMenuButton(TEXT("<"), CardPosition + FVector2D(PanelWidth - 196.0f * Scale, 124.0f * Scale), FVector2D(54.0f * Scale, 44.0f * Scale), EHUDMenuAction::LanguagePrev);
@@ -1747,7 +1802,8 @@ void APlayerGameHUD::DrawSettingValueRow(
 	float Scale,
 	EHUDMenuAction DecreaseAction,
 	EHUDMenuAction IncreaseAction,
-	float NormalizedValue)
+	float NormalizedValue,
+	EHUDSliderTarget SliderTarget)
 {
 	UFont* MediumFont = GEngine ? GEngine->GetMediumFont() : nullptr;
 	UFont* SmallFont = GEngine ? GEngine->GetSmallFont() : nullptr;
@@ -1769,6 +1825,19 @@ void APlayerGameHUD::DrawSettingValueRow(
 
 	const FVector2D BarPosition = Position + FVector2D(210.0f * Scale, 22.0f * Scale);
 	const FVector2D BarSize(RowWidth - 344.0f * Scale, 12.0f * Scale);
+
+	// Register a draggable hit area over the bar (taller than the bar itself so the
+	// knob is easy to grab). The horizontal extent matches the bar so the click
+	// ratio maps directly onto the value.
+	if (SliderTarget != EHUDSliderTarget::None && BarSize.X > 0.0f)
+	{
+		const float HitPadding = 12.0f * Scale;
+		RegisterSlider(
+			SliderTarget,
+			FVector2D(BarPosition.X, BarPosition.Y - HitPadding),
+			FVector2D(BarSize.X, BarSize.Y + HitPadding * 2.0f));
+	}
+
 	FCanvasTileItem BarBackground(BarPosition, BarSize, ValueBarBackgroundColor);
 	BarBackground.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(BarBackground);
@@ -2458,7 +2527,7 @@ FVector2D APlayerGameHUD::GetMousePosition() const
 
 bool APlayerGameHUD::IsButtonHovered(const FHUDButtonData& ButtonData) const
 {
-	const FVector2D MousePosition = GetMousePosition();
+	const FVector2D MousePosition = CachedMousePosition;
 	return MousePosition.X >= ButtonData.Position.X
 		&& MousePosition.X <= (ButtonData.Position.X + ButtonData.Size.X)
 		&& MousePosition.Y >= ButtonData.Position.Y
@@ -2473,6 +2542,48 @@ void APlayerGameHUD::RegisterButton(EHUDMenuAction Action, const FVector2D& Posi
 	ButtonData.Size = Size;
 	ButtonData.Payload = Payload;
 	ActiveButtons.Add(ButtonData);
+}
+
+void APlayerGameHUD::RegisterSlider(EHUDSliderTarget Target, const FVector2D& Position, const FVector2D& Size)
+{
+	FHUDSliderData SliderData;
+	SliderData.Target = Target;
+	SliderData.Position = Position;
+	SliderData.Size = Size;
+	ActiveSliders.Add(SliderData);
+}
+
+void APlayerGameHUD::UpdateActiveSliderDrag()
+{
+	if (ActiveDragSlider == EHUDSliderTarget::None)
+	{
+		return;
+	}
+
+	AThiefPlayerController* ThiefController = GetThiefPlayerController();
+	const bool bMouseDown = PlayerOwner && PlayerOwner->IsInputKeyDown(EKeys::LeftMouseButton);
+	if (!ThiefController || !bMouseDown)
+	{
+		// Drag finished: write the final value to disk once instead of every frame.
+		if (ThiefController)
+		{
+			ThiefController->PersistSettingsToDisk();
+		}
+		ActiveDragSlider = EHUDSliderTarget::None;
+		return;
+	}
+
+	for (const FHUDSliderData& Slider : ActiveSliders)
+	{
+		if (Slider.Target != ActiveDragSlider)
+		{
+			continue;
+		}
+
+		const float Ratio = FMath::Clamp((CachedMousePosition.X - Slider.Position.X) / FMath::Max(Slider.Size.X, 1.0f), 0.0f, 1.0f);
+		ThiefController->SetSettingValueFromRatio(ActiveDragSlider, Ratio);
+		break;
+	}
 }
 
 AThiefPlayerController* APlayerGameHUD::GetThiefPlayerController() const

@@ -11,7 +11,7 @@ class MYPROJECT_API AThifCatcherSandboxBase : public AGameplayCharacterBase
 	GENERATED_BODY()
 
 public:
-	AThifCatcherSandboxBase();
+	AThifCatcherSandboxBase(const FObjectInitializer& ObjectInitializer);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "JumpAnimation")
 	TObjectPtr<UAnimMontage> JumpAnimation;

@@ -45,6 +45,17 @@ enum class EHUDMenuAction : uint8
 	AbandonShift
 };
 
+UENUM()
+enum class EHUDSliderTarget : uint8
+{
+	None,
+	MasterVolume,
+	MusicVolume,
+	SfxVolume,
+	LookSensitivity,
+	MenuScale
+};
+
 USTRUCT()
 struct FHUDButtonData
 {
@@ -61,6 +72,21 @@ struct FHUDButtonData
 
 	UPROPERTY()
 	int32 Payload = 0;
+};
+
+USTRUCT()
+struct FHUDSliderData
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	EHUDSliderTarget Target = EHUDSliderTarget::None;
+
+	UPROPERTY()
+	FVector2D Position = FVector2D::ZeroVector;
+
+	UPROPERTY()
+	FVector2D Size = FVector2D::ZeroVector;
 };
 
 UCLASS()
@@ -98,7 +124,8 @@ private:
 		float Scale,
 		EHUDMenuAction DecreaseAction,
 		EHUDMenuAction IncreaseAction,
-		float NormalizedValue);
+		float NormalizedValue,
+		EHUDSliderTarget SliderTarget = EHUDSliderTarget::None);
 	void DrawBindingRow(
 		const class AThiefPlayerController* ThiefController,
 		const FVector2D& Position,
@@ -125,10 +152,15 @@ private:
 	FVector2D GetMousePosition() const;
 	bool IsButtonHovered(const FHUDButtonData& ButtonData) const;
 	void RegisterButton(EHUDMenuAction Action, const FVector2D& Position, const FVector2D& Size, int32 Payload = 0);
+	void RegisterSlider(EHUDSliderTarget Target, const FVector2D& Position, const FVector2D& Size);
+	void UpdateActiveSliderDrag();
 	class AGameplayCharacterBase* GetPlayerCharacter() const;
 	class AThiefPlayerController* GetThiefPlayerController() const;
 
 	TArray<FHUDButtonData> ActiveButtons;
+	TArray<FHUDSliderData> ActiveSliders;
+	EHUDSliderTarget ActiveDragSlider = EHUDSliderTarget::None;
+	FVector2D CachedMousePosition = FVector2D(-1.0f, -1.0f);
 	float ControlsBindingsScrollOffset = 0.0f;
 	float ControlsBindingsMaxScroll = 0.0f;
 	int32 LastObservedPlayerLevel = INDEX_NONE;

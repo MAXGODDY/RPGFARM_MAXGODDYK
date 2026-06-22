@@ -6,6 +6,7 @@
 #include "ThiefPlayerController.generated.h"
 
 struct FInputKeyEventArgs;
+enum class EHUDSliderTarget : uint8;
 
 UENUM(BlueprintType)
 enum class EGameLanguage : uint8
@@ -165,6 +166,8 @@ public:
 	void CancelInputRebind();
 	void ResetControlsToDefaults();
 	void ExecuteMenuOption(int32 OptionIndex);
+	void SetSettingValueFromRatio(EHUDSliderTarget Target, float Ratio);
+	void PersistSettingsToDisk() const;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Menu")

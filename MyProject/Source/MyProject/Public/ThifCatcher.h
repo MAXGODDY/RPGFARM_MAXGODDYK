@@ -13,7 +13,7 @@ class MYPROJECT_API AThifCatcher : public AGameplayCharacterBase
 	GENERATED_BODY()
 
 public:
-	AThifCatcher();
+	AThifCatcher(const FObjectInitializer& ObjectInitializer);
 
 	UPROPERTY(VisibleAnywhere)
 	USpringArmComponent* SpringArm;
