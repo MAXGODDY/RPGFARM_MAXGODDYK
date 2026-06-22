@@ -1,3 +1,13 @@
+// ============================================================================
+//  FMyProjectJsonSaveUtils — мой слой сохранений в формате JSON.
+//  Я вынес чтение/запись файлов сюда, чтобы не смешивать сохранение с игровой
+//  логикой. Файлы лежат в Saved/JsonSaves: Settings.json, Character.json,
+//  WorkOrders.json. Структуры данных превращаются в JSON-строку и обратно.
+//  ЗАЩИТА (этап 10): открываю файл/папку сохранений, когда показываю, что
+//  прогресс сохраняется и подгружается после перезапуска.
+//  Главное: Save/LoadSettingsData(), Save/LoadCharacterData(), Save/LoadWorkOrder-
+//  Data(), EnsureSaveDirectoryExists().
+// ============================================================================
 #include "Save/MyProjectJsonSaveUtils.h"
 
 #include "HAL/FileManager.h"
