@@ -1,5 +1,12 @@
 #pragma once
 
+// ============================================================================
+//  UThiefCharacterMovementComponent (.h) — кастомный компонент движения.
+//  ЗАЩИТА — по этапу 5: GetMaxSpeed() режет скорость до ходьбы при истощении
+//  стамины (это нельзя обойти из Blueprint); TickComponent() подрезает
+//  MaxWalkSpeed, чтобы анимация походки совпадала со скоростью.
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ThiefCharacterMovementComponent.generated.h"

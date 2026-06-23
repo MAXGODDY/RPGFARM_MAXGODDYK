@@ -1,5 +1,12 @@
 #pragma once
 
+// ============================================================================
+//  AWorldBoundaryWall (.h) — невидимый барьер по краям карты.
+//  ЗАЩИТА — по этапу 11 (границы мира): RebuildWalls() строит 4 коллизионные
+//  стены по периметру. Спавнится автоматически из AThiefCatcerGameMode; вторая
+//  страховка от падения — возврат на старт в AGameplayCharacterBase::Tick.
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "WorldBoundaryWall.generated.h"

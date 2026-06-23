@@ -1,5 +1,14 @@
 #pragma once
 
+// ============================================================================
+//  FMyProjectJsonSaveUtils (.h) — интерфейс слоя сохранений JSON.
+//  Ниже — структуры сохраняемых данных (настройки, персонаж, заказы) и функции
+//  записи/чтения файлов в Saved/JsonSaves. Реализация — в .cpp.
+//
+//  ЗАЩИТА — по этапу 10 (сохранение): Save/LoadCharacterData,
+//  Save/LoadSettingsData, Save/LoadWorkOrderData, EnsureSaveDirectoryExists.
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "ThiefPlayerController.h"
 #include "MyProjectJsonSaveUtils.generated.h"

@@ -1,5 +1,16 @@
 #pragma once
 
+// ============================================================================
+//  AGameplayCharacterBase (.h) — интерфейс базового класса персонажа.
+//  Ниже — поля характеристик (стамина, скорость, урон, опыт) и объявления
+//  функций геймплея. Реализация и подробные пометки — в одноимённом .cpp.
+//
+//  ЗАЩИТА — по этапам: 5 (стамина/спринт: SetSprintActive, Decrease/IncreaseStamina,
+//  Tick), 6 (добыча: Attack, TryDamageOre), 7 (торговля: SellOre, BuyStaminaPotion,
+//  UseStaminaPotion), 8 (прокачка: AddExperience, SpendUpgradePoint),
+//  10 (сохранение: BeginPlay/EndPlay), 11 (возврат при падении: Tick).
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "Animation/AnimSequenceBase.h"
 #include "Animation/AnimMontage.h"
