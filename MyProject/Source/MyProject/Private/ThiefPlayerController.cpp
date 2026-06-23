@@ -631,6 +631,8 @@ void AThiefPlayerController::ClearNearbyTrader(const ATraderNPC* TraderActor)
 	}
 }
 
+// [этап 3] Запуск игры из лобби: включаю экран загрузки, готовлю выбранный заказ
+// и через короткую задержку открываю игровую карту Showcase.
 void AThiefPlayerController::StartGameplayFromMenu()
 {
 	if (!IsInMenuMap() || bLoadingGameplayMap)
@@ -906,6 +908,8 @@ void AThiefPlayerController::ResetControlsToDefaults()
 	SaveSettingsToJson();
 }
 
+// [этапы 7, 8] Действие кнопки [1]/[2]/[3] в открытом окне: в торговле — продажа/
+// покупка, в прокачке — улучшение. Команда зависит от того, какое окно открыто.
 void AThiefPlayerController::ExecuteMenuOption(const int32 OptionIndex)
 {
 	if (bPauseMenuOpen || bSettingsMenuOpen)
@@ -957,6 +961,8 @@ void AThiefPlayerController::ExecuteMenuOption(const int32 OptionIndex)
 	}
 }
 
+// [этап 2] Установка значения ползунка по доле 0..1 (когда тяну его мышью):
+// перевожу долю в нужный диапазон (громкость, чувствительность, масштаб) и применяю.
 void AThiefPlayerController::SetSettingValueFromRatio(const EHUDSliderTarget Target, const float Ratio)
 {
 	const float ClampedRatio = FMath::Clamp(Ratio, 0.0f, 1.0f);

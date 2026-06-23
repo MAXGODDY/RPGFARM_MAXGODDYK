@@ -201,6 +201,8 @@ void AGameplayCharacterBase::SetupPlayerInputComponent(UInputComponent* PlayerIn
 	PlayerInputComponent->BindAction(TEXT("UsePotion"), IE_Pressed, this, &AGameplayCharacterBase::HandleUseStaminaPotionInput);
 }
 
+// [этапы 5, 11] Каждый кадр: считаю стамину, выставляю скорость по состоянию
+// спринта/истощения и проверяю возврат на старт при падении за край мира.
 void AGameplayCharacterBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -273,6 +275,8 @@ void AGameplayCharacterBase::Tick(float DeltaTime)
 	}
 }
 
+// [этап 6] Удар киркой: проверки (не в меню, не в прыжке), блокирую движение,
+// запускаю анимацию и через таймер бью по руде в нужный момент замаха.
 void AGameplayCharacterBase::Attack()
 {
 	if (bIsAttacking || !bCanAttack)
@@ -375,6 +379,8 @@ void AGameplayCharacterBase::Attack()
 		false);
 }
 
+// [этап 5] Включаю/выключаю спринт. Если стамина истощена или почти на нуле —
+// спринт не включится (защита от бега на нуле). Меняю максимальную скорость.
 void AGameplayCharacterBase::SetSprintActive(const bool bShouldSprint)
 {
 	if (bShouldSprint && (bStaminaExhausted || Stamina <= MinimumSprintStamina))
@@ -392,6 +398,8 @@ void AGameplayCharacterBase::SetSprintActive(const bool bShouldSprint)
 	}
 }
 
+// [этап 8] Начисляю опыт. Пока опыта хватает на уровень — повышаю уровень, даю
+// очко улучшения и увеличиваю порог опыта до следующего уровня.
 void AGameplayCharacterBase::AddExperience(const int32 ExperienceAmount)
 {
 	if (ExperienceAmount <= 0)
@@ -466,6 +474,8 @@ void AGameplayCharacterBase::ResetCharacterProgress()
 	SaveCharacterDataToJson();
 }
 
+// [этап 7] Продажа руды: проверяю, что руды хватает, уменьшаю её и добавляю
+// золото. Возвращаю false, если продать нельзя.
 bool AGameplayCharacterBase::SellOre(const int32 OreAmount, const int32 GoldPerOre)
 {
 	if (OreAmount <= 0 || GoldPerOre <= 0 || CollectedOreResources < OreAmount)
@@ -483,6 +493,8 @@ bool AGameplayCharacterBase::SellOre(const int32 OreAmount, const int32 GoldPerO
 	return true;
 }
 
+// [этап 7] Покупка зелья стамины: проверяю, что хватает золота, списываю его и
+// добавляю зелье в инвентарь.
 bool AGameplayCharacterBase::BuyStaminaPotion(const int32 GoldCost, const float RestoreAmount)
 {
 	if (GoldCost <= 0 || RestoreAmount <= 0.0f || CollectedGold < GoldCost)
@@ -498,6 +510,8 @@ bool AGameplayCharacterBase::BuyStaminaPotion(const int32 GoldCost, const float 
 	return true;
 }
 
+// [этап 7] Использование зелья (по клавише): если есть зелье и стамина не полная
+// и не идёт атака/меню — трачу зелье и восстанавливаю стамину.
 bool AGameplayCharacterBase::UseStaminaPotion()
 {
 	if (StaminaPotionCount <= 0 || FMath::IsNearlyEqual(Stamina, MaxStamina))
@@ -527,6 +541,8 @@ bool AGameplayCharacterBase::UseStaminaPotion()
 	return true;
 }
 
+// [этап 8] Трата очка улучшения: повышаю выбранную характеристику — макс. стамину,
+// урон по руде или скорость — и списываю одно очко.
 bool AGameplayCharacterBase::SpendUpgradePoint(const EPlayerUpgradeType UpgradeType)
 {
 	if (AvailableUpgradePoints <= 0)
@@ -670,6 +686,8 @@ void AGameplayCharacterBase::SetTemporaryStaminaModifiers(const float DrainMulti
 	TemporaryStaminaRegenMultiplier = FMath::Max(0.0f, RegenMultiplier);
 }
 
+// [этап 5] Расход стамины при беге. Когда стамина падает в ноль — выставляю флаг
+// истощения и выключаю спринт.
 void AGameplayCharacterBase::DecreaseStamina()
 {
 	const UWorld* World = GetWorld();
@@ -693,6 +711,8 @@ void AGameplayCharacterBase::DecreaseStamina()
 	UpdateStaminaBar();
 }
 
+// [этап 5] Восстановление стамины с задержкой после бега; в движении медленнее,
+// в покое быстрее.
 void AGameplayCharacterBase::IncreaseStamina()
 {
 	const UWorld* World = GetWorld();
@@ -787,6 +807,9 @@ void AGameplayCharacterBase::UpdateStaminaBar() const
 	StaminaBarWidget->SetStaminaValues(Stamina, MaxStamina);
 }
 
+// [этап 6] Поиск руды и нанесение урона: сначала "выстрел" сферой по направлению
+// взгляда, если не попал — выбираю ближайшую руду перед персонажем в радиусе
+// атаки и бью её. При разрушении начисляю руду и опыт.
 void AGameplayCharacterBase::TryDamageOre()
 {
 	UWorld* World = GetWorld();
