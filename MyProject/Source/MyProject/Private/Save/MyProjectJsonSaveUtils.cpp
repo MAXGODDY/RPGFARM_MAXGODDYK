@@ -1,12 +1,16 @@
 // ============================================================================
-//  FMyProjectJsonSaveUtils — мой слой сохранений в формате JSON.
-//  Я вынес чтение/запись файлов сюда, чтобы не смешивать сохранение с игровой
-//  логикой. Файлы лежат в Saved/JsonSaves: Settings.json, Character.json,
-//  WorkOrders.json. Структуры данных превращаются в JSON-строку и обратно.
-//  ЗАЩИТА (этап 10): открываю файл/папку сохранений, когда показываю, что
-//  прогресс сохраняется и подгружается после перезапуска.
-//  Главное: Save/LoadSettingsData(), Save/LoadCharacterData(), Save/LoadWorkOrder-
-//  Data(), EnsureSaveDirectoryExists().
+//  FMyProjectJsonSaveUtils — слой сохранений в формате JSON.
+//  Чтение/запись файлов я вынес в отдельный класс, чтобы не смешивать сохранение
+//  с игровой логикой. Структуры данных превращаются в JSON-строку и обратно;
+//  файлы лежат в Saved/JsonSaves: Settings.json, Character.json, WorkOrders.json.
+//  Формат текстовый и читаемый — можно открыть блокнотом и проверить.
+//
+//  ЗАЩИТА — по этапам показа:
+//   • Этап 10 (сохранение): SaveCharacterData()/LoadCharacterData() — прогресс;
+//     SaveSettingsData()/LoadSettingsData() — настройки;
+//     SaveWorkOrderData()/LoadWorkOrderData() — заказы;
+//     EnsureSaveDirectoryExists() — создаёт папку сохранений.
+//   (Показываю сам файл Character.json, потом перезапуск — данные на месте.)
 // ============================================================================
 #include "Save/MyProjectJsonSaveUtils.h"
 
