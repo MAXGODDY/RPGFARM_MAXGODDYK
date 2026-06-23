@@ -1,5 +1,16 @@
 #pragma once
 
+// ============================================================================
+//  APlayerGameHUD (.h) — интерфейс HUD (весь UI рисуется через Canvas).
+//  Ниже — перечисления действий/слайдеров, структуры кнопок и объявления всех
+//  Draw-функций. Реализация и подробные пометки — в одноимённом .cpp.
+//
+//  ЗАЩИТА — по этапам: 1 (DrawMainMenu), 2 (DrawSettingsPanel, ползунки,
+//  HandleClick/HandleScroll), 3 (DrawLoadingScreen), 6 (DrawResourcePanel,
+//  DrawStaminaPanel), 7 (DrawTradePanel), 8 (DrawProgressionPanel),
+//  9 (DrawWorkOrderPanel, DrawShiftResultScreen). Общее: DrawHUD — диспетчер.
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
 #include "PlayerGameHUD.generated.h"

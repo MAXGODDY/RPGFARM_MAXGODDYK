@@ -2,6 +2,14 @@
 
 #pragma once
 
+// ============================================================================
+//  AThiefCatcerGameMode (.h) — интерфейс игрового режима. Ниже — настройки
+//  барьера мира и объявления функций режима. Реализация — в .cpp.
+//
+//  ЗАЩИТА — по этапам: 1 (SpawnDefaultPawnFor — нет персонажа в лобби),
+//  11 (BeginPlay — авто-спавн барьера AWorldBoundaryWall).
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "ThiefCatcerGameMode.generated.h"

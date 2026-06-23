@@ -1,5 +1,15 @@
 #pragma once
 
+// ============================================================================
+//  UWorkOrderSubsystem (.h) — интерфейс системы заказов и смен (Subsystem).
+//  Ниже — структуры заказа/метрик и объявления функций выбора, запуска,
+//  отслеживания и наград. Реализация — в .cpp.
+//
+//  ЗАЩИТА — по этапу 9 (заказы/смены): CycleSelectedWorkOrder,
+//  PrepareSelectedOrderForLaunch, UpdateTrackedShift, CompleteTrackedShift,
+//  AbandonTrackedShift, GetReputation.
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "WorkOrderSubsystem.generated.h"

@@ -1,5 +1,14 @@
 #pragma once
 
+// ============================================================================
+//  AThifCatcherSandboxBase (.h) — играемая пешка (наследник
+//  AGameplayCharacterBase) на основе Game Animation Sample. Ниже — ввод
+//  движения/прыжка/спринта; вся игровая логика — в базовом классе.
+//
+//  ЗАЩИТА — по этапам: 4 (управление: MoveForwardBackward, MoveRightLeft, Jump),
+//  5 (Sprint/StopSprint → SetSprintActive базы).
+// ============================================================================
+
 #include "Animation/AnimMontage.h"
 #include "CoreMinimal.h"
 #include "GameplayCharacterBase.h"

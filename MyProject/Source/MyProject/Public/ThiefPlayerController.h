@@ -1,5 +1,16 @@
 #pragma once
 
+// ============================================================================
+//  AThiefPlayerController (.h) — интерфейс контроллера игрока.
+//  Ниже — перечисления (язык, вкладки настроек, биндинги) и объявления функций
+//  ввода, меню и настроек. Реализация и подробные пометки — в одноимённом .cpp.
+//
+//  ЗАЩИТА — по этапам: 1 (меню: HandleLeftClick, InputKey), 2 (настройки:
+//  Adjust*, SetSettingValueFromRatio, CycleLanguage, BeginRebindingInput),
+//  3 (старт→загрузка: StartGameplayFromMenu, OpenGameplayMap, ReturnToLobby),
+//  7 (торговля: ToggleTradeMenu, ExecuteMenuOption), 8 (ToggleProgressionMenu).
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Sound/SoundBase.h"

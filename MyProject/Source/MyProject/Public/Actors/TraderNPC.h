@@ -1,5 +1,14 @@
 #pragma once
 
+// ============================================================================
+//  ATraderNPC (.h) — интерфейс торговца. Ниже — компоненты (меш, зона
+//  InteractionSphere) и параметры. Реализация — в .cpp.
+//
+//  ЗАЩИТА — по этапу 7 (торговец): зона InteractionSphere запоминает торговца в
+//  контроллере; сама торговля — в персонаже (SellOre/BuyStaminaPotion) через
+//  ExecuteMenuOption контроллера.
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "TraderNPC.generated.h"

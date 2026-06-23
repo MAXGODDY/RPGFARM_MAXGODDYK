@@ -1,5 +1,13 @@
 #pragma once
 
+// ============================================================================
+//  UPlayerAnimInstance (.h) — интерфейс связи персонажа с анимацией. Ниже —
+//  поля для Anim Blueprint (Speed, Direction, bIsInAir, bShouldMove,
+//  bIsAttacking). Реализация — в .cpp.
+//
+//  ЗАЩИТА — по этапам 4-5 (движение/анимация): NativeUpdateAnimation.
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "Animation/AnimInstance.h"
 #include "PlayerAnimInstance.generated.h"

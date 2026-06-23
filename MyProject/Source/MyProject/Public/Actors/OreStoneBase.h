@@ -1,5 +1,14 @@
 #pragma once
 
+// ============================================================================
+//  AOreStoneBase (.h) — интерфейс рудного камня. Ниже — компоненты (меш, полоса
+//  здоровья, триггер) и параметры (MaxHealth, RespawnDelayMinutes, награда),
+//  которые настраиваются в BP_OreStone. Реализация — в .cpp.
+//
+//  ЗАЩИТА — по этапу 6 (добыча): ApplyDamageToOre, BreakOre, RespawnOre,
+//  GetHealthPercent/RefreshHealthBar.
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "OreStoneBase.generated.h"
