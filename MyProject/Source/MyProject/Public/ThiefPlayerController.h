@@ -1,11 +1,23 @@
 #pragma once
 
+// ============================================================================
+//  AThiefPlayerController (.h) — интерфейс контроллера игрока.
+//  Ниже — перечисления (язык, вкладки настроек, биндинги) и объявления функций
+//  ввода, меню и настроек. Реализация и подробные пометки — в одноимённом .cpp.
+//
+//  ЗАЩИТА — по этапам: 1 (меню: HandleLeftClick, InputKey), 2 (настройки:
+//  Adjust*, SetSettingValueFromRatio, CycleLanguage, BeginRebindingInput),
+//  3 (старт→загрузка: StartGameplayFromMenu, OpenGameplayMap, ReturnToLobby),
+//  7 (торговля: ToggleTradeMenu, ExecuteMenuOption), 8 (ToggleProgressionMenu).
+// ============================================================================
+
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Sound/SoundBase.h"
 #include "ThiefPlayerController.generated.h"
 
 struct FInputKeyEventArgs;
+enum class EHUDSliderTarget : uint8;
 
 UENUM(BlueprintType)
 enum class EGameLanguage : uint8
@@ -34,6 +46,7 @@ enum class ERemappableInputAction : uint8
 	Sprint,
 	Attack,
 	Interact,
+	UsePotion,
 	ToggleTradeMenu,
 	ToggleProgressionMenu,
 	MenuConfirm,
@@ -52,6 +65,7 @@ public:
 	AThiefPlayerController();
 
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 	virtual void SetupInputComponent() override;
 	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
 
@@ -75,6 +89,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "UI")
 	bool IsLoadingGameplayMap() const;
+
+	UFUNCTION(BlueprintPure, Category = "UI")
+	bool IsShiftResultScreenOpen() const;
 
 	UFUNCTION(BlueprintPure, Category = "UI")
 	bool HasNearbyTrader() const;
@@ -146,6 +163,9 @@ public:
 	void SetActiveSettingsTab(ESettingsPanelTab NewTab);
 	void ReturnToLobby();
 	void RequestQuitGame();
+	void ResetAllProgress();
+	void DismissShiftResultScreen();
+	void AbandonActiveShift();
 	void AdjustMasterVolume(float Delta);
 	void AdjustMusicVolume(float Delta);
 	void AdjustSfxVolume(float Delta);
@@ -157,6 +177,8 @@ public:
 	void CancelInputRebind();
 	void ResetControlsToDefaults();
 	void ExecuteMenuOption(int32 OptionIndex);
+	void SetSettingValueFromRatio(EHUDSliderTarget Target, float Ratio);
+	void PersistSettingsToDisk() const;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Menu")
@@ -197,6 +219,7 @@ private:
 	void EnsureInputMappingsExist();
 	void UpdateLobbyMusic();
 	void OpenGameplayMap();
+	void HandleAttackAction();
 	void HandleInteractAction();
 	void HandlePrimaryConfirm();
 	void HandleBackAction();
@@ -210,6 +233,7 @@ private:
 	bool ApplyBindingKey(ERemappableInputAction InputAction, const FKey& NewKey);
 	FKey GetCurrentBindingKey(ERemappableInputAction InputAction) const;
 	class AGameplayCharacterBase* GetPlayerCharacter() const;
+	class UWorkOrderSubsystem* GetWorkOrderSubsystem() const;
 
 	bool bTradeMenuOpen;
 	bool bProgressionMenuOpen;

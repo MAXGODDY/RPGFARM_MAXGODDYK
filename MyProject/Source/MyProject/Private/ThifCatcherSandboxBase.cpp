@@ -2,7 +2,8 @@
 
 #include "Components/InputComponent.h"
 
-AThifCatcherSandboxBase::AThifCatcherSandboxBase()
+AThifCatcherSandboxBase::AThifCatcherSandboxBase(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	JumpAnimation = nullptr;
 }
@@ -31,6 +32,8 @@ void AThifCatcherSandboxBase::SetupPlayerInputComponent(UInputComponent* PlayerI
 
 void AThifCatcherSandboxBase::MoveForwardBackward(const float Value)
 {
+	ForwardMovementInputValue = Value;
+
 	if (bIsAttacking || !Controller || FMath::IsNearlyZero(Value))
 	{
 		return;
@@ -44,6 +47,8 @@ void AThifCatcherSandboxBase::MoveForwardBackward(const float Value)
 
 void AThifCatcherSandboxBase::MoveRightLeft(const float Value)
 {
+	RightMovementInputValue = Value;
+
 	if (bIsAttacking || !Controller || FMath::IsNearlyZero(Value))
 	{
 		return;
@@ -83,4 +88,10 @@ void AThifCatcherSandboxBase::Sprint()
 void AThifCatcherSandboxBase::StopSprint()
 {
 	SetSprintActive(false);
+}
+
+bool AThifCatcherSandboxBase::HasMovementInputIntent() const
+{
+	return !FMath::IsNearlyZero(ForwardMovementInputValue, 0.01f)
+		|| !FMath::IsNearlyZero(RightMovementInputValue, 0.01f);
 }

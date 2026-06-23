@@ -1,3 +1,19 @@
+// ============================================================================
+//  AThiefPlayerController — контроллер игрока: ввод, меню, настройки, карты.
+//  Через него проходит весь ввод и состояния интерфейса. Я держу логику меню
+//  отдельно от персонажа, чтобы не смешивать управление вводом с игровым
+//  поведением. Также хранит и сохраняет настройки и переназначение клавиш.
+//
+//  ЗАЩИТА — по этапам показа (какие функции открывать):
+//   • Этап 1 (меню): HandleLeftClick(), InputKey() — клики/клавиши по интерфейсу.
+//   • Этап 2 (настройки): AdjustMasterVolume()/…, SetSettingValueFromRatio()
+//     (ползунки), CycleLanguage(), BeginRebindingInput()/ApplyBindingKey(),
+//     Load/SaveSettingsToJson().
+//   • Этап 3 (старт→загрузка): StartGameplayFromMenu(), OpenGameplayMap(), ReturnToLobby().
+//   • Этап 7 (торговля): ToggleTradeMenu(), ExecuteMenuOption().
+//   • Этап 8 (окно прокачки): ToggleProgressionMenu().
+//   Общее: ApplyMenuInputState() — переключение режима ввода: меню ↔ игра.
+// ============================================================================
 #include "ThiefPlayerController.h"
 
 #include "Actors/OreStoneBase.h"
@@ -15,6 +31,7 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "Misc/PackageName.h"
 #include "Save/MyProjectJsonSaveUtils.h"
+#include "Systems/WorkOrderSubsystem.h"
 #include "GameplayCharacterBase.h"
 #include "UI/PlayerGameHUD.h"
 #include "UObject/ConstructorHelpers.h"
@@ -80,6 +97,7 @@ namespace
 			{ ERemappableInputAction::Sprint, TEXT("Sprint"), EKeys::LeftShift, false, 1.0f, TEXT("Sprint"), TEXT("Спринт"), TEXT("Run faster while stamina lasts"), TEXT("Быстрое движение за счёт стамины") },
 			{ ERemappableInputAction::Attack, TEXT("Attack"), EKeys::LeftMouseButton, false, 1.0f, TEXT("Attack"), TEXT("Удар"), TEXT("Swing the pickaxe and damage ore"), TEXT("Удар киркой по руде") },
 			{ ERemappableInputAction::Interact, InteractActionName, EKeys::E, false, 1.0f, TEXT("Interact"), TEXT("Взаимодействие"), TEXT("Interact with the trader"), TEXT("Взаимодействие с торговцем") },
+			{ ERemappableInputAction::UsePotion, TEXT("UsePotion"), EKeys::Q, false, 1.0f, TEXT("Use Potion"), TEXT("Использовать зелье"), TEXT("Drink a stored stamina potion"), TEXT("Выпить сохранённое зелье стамины") },
 			{ ERemappableInputAction::ToggleTradeMenu, ToggleTradeActionName, EKeys::B, false, 1.0f, TEXT("Quick Trade"), TEXT("Быстрая торговля"), TEXT("Open the trade menu near the trader"), TEXT("Открытие торговли рядом с NPC") },
 			{ ERemappableInputAction::ToggleProgressionMenu, ToggleProgressionActionName, EKeys::P, false, 1.0f, TEXT("Progression"), TEXT("Прокачка"), TEXT("Open the character progression panel"), TEXT("Открытие окна прокачки") },
 			{ ERemappableInputAction::MenuConfirm, MenuConfirmActionName, EKeys::Enter, false, 1.0f, TEXT("Confirm / Start"), TEXT("Подтвердить / Старт"), TEXT("Start the game or confirm a menu action"), TEXT("Старт игры или подтверждение меню") },
@@ -287,6 +305,30 @@ void AThiefPlayerController::BeginPlay()
 		0.25f);
 }
 
+void AThiefPlayerController::Tick(const float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (bLoadingGameplayMap || IsInMenuMap())
+	{
+		return;
+	}
+
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+		{
+			WorkOrderSubsystem->TryStartPendingShift(PlayerCharacter, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f);
+			WorkOrderSubsystem->UpdateTrackedShift(PlayerCharacter, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f);
+			WorkOrderSubsystem->ApplyActiveShiftEffects(PlayerCharacter);
+			if (WorkOrderSubsystem->HasResolvedShiftResult())
+			{
+				ApplyMenuInputState();
+			}
+		}
+	}
+}
+
 void AThiefPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -305,8 +347,11 @@ void AThiefPlayerController::SetupInputComponent()
 	BackBinding.bExecuteWhenPaused = true;
 
 	FInputKeyBinding& LeftClickBinding = InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &AThiefPlayerController::HandleLeftClick);
-	LeftClickBinding.bConsumeInput = false;
+	LeftClickBinding.bConsumeInput = true;
 	LeftClickBinding.bExecuteWhenPaused = true;
+
+	FInputActionBinding& AttackBinding = InputComponent->BindAction(TEXT("Attack"), IE_Pressed, this, &AThiefPlayerController::HandleAttackAction);
+	AttackBinding.bConsumeInput = true;
 
 	FInputActionBinding& InteractBinding = InputComponent->BindAction(InteractActionName, IE_Pressed, this, &AThiefPlayerController::HandleInteractAction);
 	InteractBinding.bConsumeInput = true;
@@ -343,6 +388,38 @@ bool AThiefPlayerController::InputKey(const FInputKeyEventArgs& Params)
 		return TryCaptureInputRebind(Params.Key);
 	}
 
+	if (!bWaitingForInputRebind && Params.Event == IE_Pressed && Params.Key == EKeys::Escape)
+	{
+		HandleBackAction();
+		return true;
+	}
+
+	if (!bWaitingForInputRebind
+		&& Params.Event == IE_Pressed
+		&& (Params.Key == EKeys::MouseScrollUp || Params.Key == EKeys::MouseScrollDown))
+	{
+		if (APlayerGameHUD* PlayerHUD = Cast<APlayerGameHUD>(GetHUD()))
+		{
+			const float WheelDelta = Params.Key == EKeys::MouseScrollDown ? 1.0f : -1.0f;
+			if (PlayerHUD->HandleScroll(WheelDelta))
+			{
+				return true;
+			}
+		}
+	}
+
+	if (!bWaitingForInputRebind && Params.Event == IE_Pressed && Params.Key == EKeys::LeftMouseButton)
+	{
+		if (IsAnyModalOpen())
+		{
+			HandleLeftClick();
+			return true;
+		}
+
+		HandleAttackAction();
+		return true;
+	}
+
 	return Super::InputKey(Params);
 }
 
@@ -373,12 +450,18 @@ bool AThiefPlayerController::IsSettingsMenuOpen() const
 
 bool AThiefPlayerController::IsAnyModalOpen() const
 {
-	return bTradeMenuOpen || bProgressionMenuOpen || bPauseMenuOpen || bSettingsMenuOpen || IsInMenuMap();
+	return bTradeMenuOpen || bProgressionMenuOpen || bPauseMenuOpen || bSettingsMenuOpen || IsShiftResultScreenOpen() || IsInMenuMap();
 }
 
 bool AThiefPlayerController::IsLoadingGameplayMap() const
 {
 	return bLoadingGameplayMap;
+}
+
+bool AThiefPlayerController::IsShiftResultScreenOpen() const
+{
+	const UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem();
+	return WorkOrderSubsystem && WorkOrderSubsystem->HasResolvedShiftResult();
 }
 
 bool AThiefPlayerController::HasNearbyTrader() const
@@ -391,6 +474,16 @@ FText AThiefPlayerController::GetNearbyTraderPromptText() const
 	if (!NearbyTrader.IsValid())
 	{
 		return FText::GetEmpty();
+	}
+
+	if (const UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		if (WorkOrderSubsystem->IsShiftReadyToTurnIn())
+		{
+			return CurrentLanguage == EGameLanguage::Russian
+				? FText::FromString(TEXT("[E] Сдать заказ"))
+				: FText::FromString(TEXT("[E] Turn In Order"));
+		}
 	}
 
 	return CurrentLanguage == EGameLanguage::Russian
@@ -538,6 +631,8 @@ void AThiefPlayerController::ClearNearbyTrader(const ATraderNPC* TraderActor)
 	}
 }
 
+// [этап 3] Запуск игры из лобби: включаю экран загрузки, готовлю выбранный заказ
+// и через короткую задержку открываю игровую карту Showcase.
 void AThiefPlayerController::StartGameplayFromMenu()
 {
 	if (!IsInMenuMap() || bLoadingGameplayMap)
@@ -548,6 +643,12 @@ void AThiefPlayerController::StartGameplayFromMenu()
 	CancelInputRebind();
 	bSettingsMenuOpen = false;
 	bLoadingGameplayMap = true;
+
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		WorkOrderSubsystem->PrepareSelectedOrderForLaunch();
+	}
+
 	ApplyMenuInputState();
 	UpdateLobbyMusic();
 
@@ -642,6 +743,10 @@ void AThiefPlayerController::ReturnToLobby()
 	bLoadingGameplayMap = false;
 	NearbyTrader = nullptr;
 	CloseAllMenus();
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		WorkOrderSubsystem->NotifyReturnedToLobby();
+	}
 	UpdateLobbyMusic();
 	UGameplayStatics::OpenLevel(this, MenuMapName);
 }
@@ -649,6 +754,56 @@ void AThiefPlayerController::ReturnToLobby()
 void AThiefPlayerController::RequestQuitGame()
 {
 	UKismetSystemLibrary::QuitGame(this, this, EQuitPreference::Quit, false);
+}
+
+void AThiefPlayerController::ResetAllProgress()
+{
+	if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+	{
+		PlayerCharacter->ResetCharacterProgress();
+	}
+
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		WorkOrderSubsystem->ResetPersistentProgress();
+	}
+}
+
+void AThiefPlayerController::DismissShiftResultScreen()
+{
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		WorkOrderSubsystem->DismissShiftResult();
+	}
+
+	if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+	{
+		PlayerCharacter->SetTemporaryStaminaModifiers(1.0f, 1.0f);
+	}
+
+	ApplyMenuInputState();
+}
+
+void AThiefPlayerController::AbandonActiveShift()
+{
+	UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem();
+	AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter();
+	if (!WorkOrderSubsystem || !WorkOrderSubsystem->AbandonTrackedShift(PlayerCharacter))
+	{
+		return;
+	}
+
+	if (PlayerCharacter)
+	{
+		PlayerCharacter->SetTemporaryStaminaModifiers(1.0f, 1.0f);
+	}
+
+	bPauseMenuOpen = false;
+	bTradeMenuOpen = false;
+	bProgressionMenuOpen = false;
+	bSettingsMenuOpen = false;
+	CancelInputRebind();
+	ApplyMenuInputState();
 }
 
 void AThiefPlayerController::AdjustMasterVolume(const float Delta)
@@ -753,6 +908,8 @@ void AThiefPlayerController::ResetControlsToDefaults()
 	SaveSettingsToJson();
 }
 
+// [этапы 7, 8] Действие кнопки [1]/[2]/[3] в открытом окне: в торговле — продажа/
+// покупка, в прокачке — улучшение. Команда зависит от того, какое окно открыто.
 void AThiefPlayerController::ExecuteMenuOption(const int32 OptionIndex)
 {
 	if (bPauseMenuOpen || bSettingsMenuOpen)
@@ -804,6 +961,42 @@ void AThiefPlayerController::ExecuteMenuOption(const int32 OptionIndex)
 	}
 }
 
+// [этап 2] Установка значения ползунка по доле 0..1 (когда тяну его мышью):
+// перевожу долю в нужный диапазон (громкость, чувствительность, масштаб) и применяю.
+void AThiefPlayerController::SetSettingValueFromRatio(const EHUDSliderTarget Target, const float Ratio)
+{
+	const float ClampedRatio = FMath::Clamp(Ratio, 0.0f, 1.0f);
+	switch (Target)
+	{
+	case EHUDSliderTarget::MasterVolume:
+		MasterVolumeSetting = ClampedRatio;
+		ApplyAudioSettings();
+		break;
+	case EHUDSliderTarget::MusicVolume:
+		MusicVolumeSetting = ClampedRatio;
+		UpdateLobbyMusic();
+		break;
+	case EHUDSliderTarget::SfxVolume:
+		SfxVolumeSetting = ClampedRatio;
+		ApplyWorldAudioVolumes();
+		break;
+	case EHUDSliderTarget::LookSensitivity:
+		LookSensitivitySetting = FMath::Clamp(MinLookSensitivity + ClampedRatio * (MaxLookSensitivity - MinLookSensitivity), MinLookSensitivity, MaxLookSensitivity);
+		ApplyLookSettings();
+		break;
+	case EHUDSliderTarget::MenuScale:
+		MenuScaleSetting = FMath::Clamp(MinMenuScale + ClampedRatio * (MaxMenuScale - MinMenuScale), MinMenuScale, MaxMenuScale);
+		break;
+	default:
+		break;
+	}
+}
+
+void AThiefPlayerController::PersistSettingsToDisk() const
+{
+	SaveSettingsToJson();
+}
+
 void AThiefPlayerController::LoadSettingsFromJson()
 {
 	EnsureInputMappingsExist();
@@ -831,18 +1024,79 @@ void AThiefPlayerController::LoadSettingsFromJson()
 	if (SaveData.InputBindings.Num() > 0)
 	{
 		UInputSettings* InputSettings = UInputSettings::GetInputSettings();
-		bool bMappingsChanged = false;
+		TMap<uint8, FKey> SavedKeysByActionId;
 		for (const FMyProjectInputBindingSaveData& SavedBinding : SaveData.InputBindings)
 		{
-			const FRemappableBindingDefinition* Definition = FindBindingDefinition(static_cast<ERemappableInputAction>(SavedBinding.InputAction));
-			const FKey NewKey(*SavedBinding.KeyName);
-			if (!Definition || !NewKey.IsValid())
+			const FKey SavedKey(*SavedBinding.KeyName);
+			if (SavedKey.IsValid())
 			{
-				continue;
+				SavedKeysByActionId.Add(SavedBinding.InputAction, SavedKey);
 			}
+		}
 
-			SetBindingKeyOnInputSettings(InputSettings, *Definition, NewKey);
-			bMappingsChanged = true;
+		const uint8 UsePotionId = static_cast<uint8>(ERemappableInputAction::UsePotion);
+		const uint8 ToggleTradeMenuId = static_cast<uint8>(ERemappableInputAction::ToggleTradeMenu);
+		const uint8 ToggleProgressionMenuId = static_cast<uint8>(ERemappableInputAction::ToggleProgressionMenu);
+		const uint8 MenuConfirmId = static_cast<uint8>(ERemappableInputAction::MenuConfirm);
+		const uint8 MenuBackId = static_cast<uint8>(ERemappableInputAction::MenuBack);
+		const bool bNeedsLegacyBindingMigration =
+			SavedKeysByActionId.Contains(UsePotionId) &&
+			SavedKeysByActionId.Contains(ToggleTradeMenuId) &&
+			SavedKeysByActionId.Contains(ToggleProgressionMenuId) &&
+			SavedKeysByActionId.Contains(MenuConfirmId) &&
+			SavedKeysByActionId.Contains(MenuBackId) &&
+			SavedKeysByActionId[UsePotionId] == EKeys::B &&
+			SavedKeysByActionId[ToggleTradeMenuId] == EKeys::P &&
+			SavedKeysByActionId[MenuConfirmId] == EKeys::Escape;
+
+		bool bMappingsChanged = false;
+		if (bNeedsLegacyBindingMigration)
+		{
+			for (const FRemappableBindingDefinition& Definition : GetRemappableBindingDefinitions())
+			{
+				FKey NewKey = EKeys::Invalid;
+				const uint8 CurrentActionId = static_cast<uint8>(Definition.InputAction);
+				if (CurrentActionId <= static_cast<uint8>(ERemappableInputAction::Interact))
+				{
+					NewKey = SavedKeysByActionId.FindRef(CurrentActionId);
+				}
+				else if (CurrentActionId == UsePotionId)
+				{
+					NewKey = EKeys::Q;
+				}
+				else
+				{
+					NewKey = SavedKeysByActionId.FindRef(CurrentActionId - 1);
+				}
+
+				if (!NewKey.IsValid())
+				{
+					continue;
+				}
+
+				SetBindingKeyOnInputSettings(InputSettings, Definition, NewKey);
+				bMappingsChanged = true;
+			}
+		}
+		else
+		{
+			for (const FMyProjectInputBindingSaveData& SavedBinding : SaveData.InputBindings)
+			{
+				const FRemappableBindingDefinition* Definition = FindBindingDefinition(static_cast<ERemappableInputAction>(SavedBinding.InputAction));
+				if (!Definition)
+				{
+					continue;
+				}
+
+				const FKey NewKey = SavedKeysByActionId.FindRef(SavedBinding.InputAction);
+				if (!NewKey.IsValid())
+				{
+					continue;
+				}
+
+				SetBindingKeyOnInputSettings(InputSettings, *Definition, NewKey);
+				bMappingsChanged = true;
+			}
 		}
 
 		if (InputSettings && bMappingsChanged)
@@ -854,6 +1108,11 @@ void AThiefPlayerController::LoadSettingsFromJson()
 			{
 				PlayerInput->ForceRebuildingKeyMaps(false);
 			}
+		}
+
+		if (bNeedsLegacyBindingMigration)
+		{
+			SaveSettingsToJson();
 		}
 	}
 }
@@ -882,7 +1141,7 @@ void AThiefPlayerController::SaveSettingsToJson() const
 
 void AThiefPlayerController::ApplyMenuInputState()
 {
-	const bool bMenuLocked = bTradeMenuOpen || bProgressionMenuOpen || bPauseMenuOpen || bSettingsMenuOpen || IsInMenuMap();
+	const bool bMenuLocked = bTradeMenuOpen || bProgressionMenuOpen || bPauseMenuOpen || bSettingsMenuOpen || IsShiftResultScreenOpen() || IsInMenuMap();
 	ResetIgnoreMoveInput();
 	ResetIgnoreLookInput();
 	if (bMenuLocked)
@@ -1101,6 +1360,19 @@ void AThiefPlayerController::OpenGameplayMap()
 	UGameplayStatics::OpenLevel(this, GameplayMapName);
 }
 
+void AThiefPlayerController::HandleAttackAction()
+{
+	if (IsInMenuMap() || bLoadingGameplayMap || IsAnyModalOpen())
+	{
+		return;
+	}
+
+	if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+	{
+		PlayerCharacter->Attack();
+	}
+}
+
 void AThiefPlayerController::HandleInteractAction()
 {
 	if (IsInMenuMap() || !HasNearbyTrader() || bPauseMenuOpen || bSettingsMenuOpen)
@@ -1116,6 +1388,26 @@ void AThiefPlayerController::HandleInteractAction()
 		}
 	}
 
+	if (UWorkOrderSubsystem* WorkOrderSubsystem = GetWorkOrderSubsystem())
+	{
+		if (WorkOrderSubsystem->IsShiftReadyToTurnIn())
+		{
+			if (AGameplayCharacterBase* PlayerCharacter = GetPlayerCharacter())
+			{
+				int32 GoldReward = 0;
+				int32 ExperienceReward = 0;
+				int32 ReputationReward = 0;
+				if (WorkOrderSubsystem->CompleteTrackedShift(PlayerCharacter, GoldReward, ExperienceReward, ReputationReward))
+				{
+					bTradeMenuOpen = false;
+					bProgressionMenuOpen = false;
+					ApplyMenuInputState();
+					return;
+				}
+			}
+		}
+	}
+
 	bTradeMenuOpen = !bTradeMenuOpen;
 	if (bTradeMenuOpen)
 	{
@@ -1127,6 +1419,12 @@ void AThiefPlayerController::HandleInteractAction()
 
 void AThiefPlayerController::HandlePrimaryConfirm()
 {
+	if (IsShiftResultScreenOpen())
+	{
+		DismissShiftResultScreen();
+		return;
+	}
+
 	if (IsInMenuMap())
 	{
 		if (bSettingsMenuOpen)
@@ -1149,6 +1447,12 @@ void AThiefPlayerController::HandleBackAction()
 {
 	if (bLoadingGameplayMap)
 	{
+		return;
+	}
+
+	if (IsShiftResultScreenOpen())
+	{
+		DismissShiftResultScreen();
 		return;
 	}
 
@@ -1183,25 +1487,26 @@ void AThiefPlayerController::HandleBackAction()
 
 void AThiefPlayerController::HandleLeftClick()
 {
-	if (!IsAnyModalOpen())
+	if (IsAnyModalOpen())
 	{
+		APlayerGameHUD* PlayerHUD = Cast<APlayerGameHUD>(GetHUD());
+		if (!PlayerHUD)
+		{
+			return;
+		}
+
+		float MouseX = 0.0f;
+		float MouseY = 0.0f;
+		if (!GetMousePosition(MouseX, MouseY))
+		{
+			return;
+		}
+
+		PlayerHUD->HandleClick(FVector2D(MouseX, MouseY));
 		return;
 	}
 
-	APlayerGameHUD* PlayerHUD = Cast<APlayerGameHUD>(GetHUD());
-	if (!PlayerHUD)
-	{
-		return;
-	}
-
-	float MouseX = 0.0f;
-	float MouseY = 0.0f;
-	if (!GetMousePosition(MouseX, MouseY))
-	{
-		return;
-	}
-
-	PlayerHUD->HandleClick(FVector2D(MouseX, MouseY));
+	HandleAttackAction();
 }
 
 void AThiefPlayerController::ToggleTradeMenu()
@@ -1360,4 +1665,9 @@ FKey AThiefPlayerController::GetCurrentBindingKey(const ERemappableInputAction I
 AGameplayCharacterBase* AThiefPlayerController::GetPlayerCharacter() const
 {
 	return Cast<AGameplayCharacterBase>(GetPawn());
+}
+
+UWorkOrderSubsystem* AThiefPlayerController::GetWorkOrderSubsystem() const
+{
+	return GetGameInstance() ? GetGameInstance()->GetSubsystem<UWorkOrderSubsystem>() : nullptr;
 }

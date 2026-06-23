@@ -1,10 +1,21 @@
+// ============================================================================
+//  AThifCatcher — управляемый персонаж (наследник AGameplayCharacterBase).
+//  Этот класс отвечает только за "тело и камеру": камера от третьего лица на
+//  SpringArm, ввод движения, прыжок и спринт. Вся игровая логика (стамина,
+//  атака, ресурсы) остаётся в базовом классе — здесь только управление.
+//
+//  ЗАЩИТА — по этапам показа:
+//   • Этап 4 (управление/камера): конструктор (SpringArm + Camera),
+//     MoveForwardBackward()/MoveRightLeft(), Jump().
+//   • Этап 5 (спринт): Sprint()/StopSprint() — вызывают SetSprintActive() базы.
+// ============================================================================
 #include "ThifCatcher.h"
 
 #include "Components/InputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
-AThifCatcher::AThifCatcher()
-	: Super()
+AThifCatcher::AThifCatcher(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArmComponent"));
 	SpringArm->SetupAttachment(RootComponent);

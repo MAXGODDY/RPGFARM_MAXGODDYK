@@ -1,3 +1,17 @@
+// ============================================================================
+//  AOreStoneBase — рудный камень, который добывает игрок.
+//  Класс хранит здоровье руды и отвечает за получение урона от кирки,
+//  разрушение, повторное появление (respawn) и полосу здоровья, которая видна
+//  только когда игрок рядом. При разрушении выдаёт ресурс и опыт персонажу.
+//  Числа настраиваются в BP_OreStone → Class Defaults (без правки кода).
+//
+//  ЗАЩИТА — по этапам показа:
+//   • Этап 6 (добыча руды): ApplyDamageToOre() — урон; BreakOre() — разрушение и
+//     запуск таймера respawn; RespawnOre() — возврат руды; GetHealthPercent()/
+//     RefreshHealthBar() — полоса здоровья.
+//   Параметры: MaxHealth, RespawnDelayMinutes (минуты), OreResourceReward,
+//   OreExperienceReward.
+// ============================================================================
 #include "Actors/OreStoneBase.h"
 
 #include "Components/SceneComponent.h"
@@ -50,6 +64,8 @@ AOreStoneBase::AOreStoneBase()
 	bPlayerInHealthBarRange = false;
 }
 
+// [этап 6] Получаю урон от удара киркой: уменьшаю здоровье, обновляю полосу; если
+// здоровье кончилось — вызываю разрушение руды.
 void AOreStoneBase::ApplyDamageToOre(float DamageAmount)
 {
 	if (!bOreAvailable || DamageAmount <= 0.0f)
@@ -234,6 +250,8 @@ void AOreStoneBase::RefreshPlayerInHealthBarRange()
 	bPlayerInHealthBarRange = false;
 }
 
+// [этап 6] Разрушение руды: прячу меш, отключаю коллизию и полосу, запускаю
+// таймер на повторное появление (respawn) через RespawnDelayMinutes.
 void AOreStoneBase::BreakOre()
 {
 	bOreAvailable = false;
@@ -269,6 +287,8 @@ void AOreStoneBase::BreakOre()
 		false);
 }
 
+// [этап 6] Повторное появление руды: возвращаю полное здоровье, показываю меш и
+// включаю коллизию — камень снова можно добывать.
 void AOreStoneBase::RespawnOre()
 {
 	bOreAvailable = true;

@@ -1,3 +1,17 @@
+// ============================================================================
+//  FMyProjectJsonSaveUtils — слой сохранений в формате JSON.
+//  Чтение/запись файлов я вынес в отдельный класс, чтобы не смешивать сохранение
+//  с игровой логикой. Структуры данных превращаются в JSON-строку и обратно;
+//  файлы лежат в Saved/JsonSaves: Settings.json, Character.json, WorkOrders.json.
+//  Формат текстовый и читаемый — можно открыть блокнотом и проверить.
+//
+//  ЗАЩИТА — по этапам показа:
+//   • Этап 10 (сохранение): SaveCharacterData()/LoadCharacterData() — прогресс;
+//     SaveSettingsData()/LoadSettingsData() — настройки;
+//     SaveWorkOrderData()/LoadWorkOrderData() — заказы;
+//     EnsureSaveDirectoryExists() — создаёт папку сохранений.
+//   (Показываю сам файл Character.json, потом перезапуск — данные на месте.)
+// ============================================================================
 #include "Save/MyProjectJsonSaveUtils.h"
 
 #include "HAL/FileManager.h"
@@ -10,6 +24,7 @@ namespace
 	const FString JsonSaveDirectory = TEXT("JsonSaves");
 	const FString SettingsFileName = TEXT("Settings.json");
 	const FString CharacterFileName = TEXT("Character.json");
+	const FString WorkOrderFileName = TEXT("WorkOrders.json");
 }
 
 bool FMyProjectJsonSaveUtils::SaveSettingsData(const FMyProjectSettingsSaveData& SaveData)
@@ -32,6 +47,16 @@ bool FMyProjectJsonSaveUtils::LoadCharacterData(FMyProjectCharacterSaveData& Out
 	return LoadStructFromJsonFile(OutSaveData, GetCharacterSavePath());
 }
 
+bool FMyProjectJsonSaveUtils::SaveWorkOrderData(const FMyProjectWorkOrderSaveData& SaveData)
+{
+	return SaveStructToJsonFile(SaveData, GetWorkOrderSavePath());
+}
+
+bool FMyProjectJsonSaveUtils::LoadWorkOrderData(FMyProjectWorkOrderSaveData& OutSaveData)
+{
+	return LoadStructFromJsonFile(OutSaveData, GetWorkOrderSavePath());
+}
+
 FString FMyProjectJsonSaveUtils::GetSettingsSavePath()
 {
 	return FPaths::Combine(FPaths::ProjectSavedDir(), JsonSaveDirectory, SettingsFileName);
@@ -40,6 +65,11 @@ FString FMyProjectJsonSaveUtils::GetSettingsSavePath()
 FString FMyProjectJsonSaveUtils::GetCharacterSavePath()
 {
 	return FPaths::Combine(FPaths::ProjectSavedDir(), JsonSaveDirectory, CharacterFileName);
+}
+
+FString FMyProjectJsonSaveUtils::GetWorkOrderSavePath()
+{
+	return FPaths::Combine(FPaths::ProjectSavedDir(), JsonSaveDirectory, WorkOrderFileName);
 }
 
 bool FMyProjectJsonSaveUtils::EnsureSaveDirectoryExists(const FString& FilePath)
@@ -85,3 +115,5 @@ template bool FMyProjectJsonSaveUtils::SaveStructToJsonFile(const FMyProjectSett
 template bool FMyProjectJsonSaveUtils::LoadStructFromJsonFile(FMyProjectSettingsSaveData& OutSaveData, const FString& FilePath);
 template bool FMyProjectJsonSaveUtils::SaveStructToJsonFile(const FMyProjectCharacterSaveData& SaveData, const FString& FilePath);
 template bool FMyProjectJsonSaveUtils::LoadStructFromJsonFile(FMyProjectCharacterSaveData& OutSaveData, const FString& FilePath);
+template bool FMyProjectJsonSaveUtils::SaveStructToJsonFile(const FMyProjectWorkOrderSaveData& SaveData, const FString& FilePath);
+template bool FMyProjectJsonSaveUtils::LoadStructFromJsonFile(FMyProjectWorkOrderSaveData& OutSaveData, const FString& FilePath);
