@@ -34,16 +34,20 @@ float AMainCheracter::DecreaseStamina()
 
 bool AMainCheracter::StaminaIsZero()
 {
-	if(ChacterStamina <= 0)
+	pIsTired = ChacterStamina <= 0.0f;
+
+	if (pIsTired)
 	{
-		pIsTired = true;
-
 		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision); // Disable collision for the character's capsule component when stamina is zero, effectively making the character unable to interact with the environment
-		
+		if (TiredSound)
+		{
+			UGameplayStatics::SpawnSoundAtLocation(this, TiredSound, GetActorLocation()); // Play the tired sound at the character's location
+		}
 	}
-
-	UGameplayStatics::SpawnSoundAtLocation(this, TiredSound, GetActorLocation()); // Play the tired sound at the character's location
-
+	else
+	{
+		GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	}
 
 	return pIsTired;
 }

@@ -7,10 +7,51 @@ public class MyProject : ModuleRules
 	public MyProject(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
+		PublicDependencyModuleNames.AddRange(new string[]
+		{
+			"Core",
+			"CoreUObject",
+			"Engine",
+			"InputCore",
+			"EnhancedInput",
+			"UMG",
+			"AnimGraphRuntime"
+		});
+
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"Slate",
+			"SlateCore",
+			"Json",
+			"JsonUtilities",
+			"AIModule",
+			"AnimationLocomotionLibraryRuntime",
+			"AnimationWarpingRuntime",
+			"BlendStack",
+			"Chooser",
+			"CurveExpression",
+			"DrawDebugLibrary",
+			"GameplayCameras",
+			"GameplayInteractionsModule",
+			"GameplayTags",
+			"GameplayTasks",
+			"Locomotor",
+			"Mover",
+			"MotionWarping",
+			"NetworkPrediction",
+			"ProxyTable",
+			"SmartObjectsModule"
+		});
+
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.AddRange(new string[]
+			{
+				"ChooserUncooked",
+				"ProxyTableUncooked"
+			});
+		}
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
